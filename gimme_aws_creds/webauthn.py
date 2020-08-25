@@ -17,13 +17,13 @@ from threading import Event, Thread
 
 from ctap_keyring_device.ctap_keyring_device import CtapKeyringDevice
 from ctap_keyring_device.ctap_strucs import CtapOptions
-from fido2 import cose
+from fido2 import cose, utils
 from fido2.client import Fido2Client, ClientError
 from fido2.hid import CtapHidDevice, STATUS
 from fido2.utils import websafe_decode
 from fido2.webauthn import PublicKeyCredentialCreationOptions, \
-    PublicKeyCredentialType, PublicKeyCredentialParameters, PublicKeyCredentialDescriptor, UserVerificationRequirement
-from fido2.webauthn import PublicKeyCredentialRequestOptions
+    PublicKeyCredentialType, PublicKeyCredentialParameters, PublicKeyCredentialDescriptor, UserVerificationRequirement, \
+    PublicKeyCredentialRequestOptions
 
 from gimme_aws_creds.errors import NoFIDODeviceFoundError, FIDODeviceTimeoutError
 
