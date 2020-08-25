@@ -23,7 +23,6 @@ from fido2.hid import CtapHidDevice, STATUS
 from fido2.utils import websafe_decode
 from fido2.webauthn import PublicKeyCredentialCreationOptions, \
     PublicKeyCredentialType, PublicKeyCredentialParameters, PublicKeyCredentialDescriptor, UserVerificationRequirement
-from fido2.webauthn import PublicKeyCredentialRequestOptions
 
 from gimme_aws_creds.errors import NoFIDODeviceFoundError, FIDODeviceTimeoutError
 
