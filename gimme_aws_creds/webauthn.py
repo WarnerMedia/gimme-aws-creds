@@ -15,9 +15,9 @@ from __future__ import print_function, absolute_import, unicode_literals
 import base64
 from threading import Event, Thread
 
+from fido2 import utils
 from fido2.client import Fido2Client, ClientError
 from fido2.hid import CtapHidDevice, STATUS
-from fido2 import utils
 from fido2.webauthn import PublicKeyCredentialRequestOptions
 from getpass import getpass
 from gimme_aws_creds.errors import NoFIDODeviceFoundError, FIDODeviceTimeoutError
