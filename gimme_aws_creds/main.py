@@ -786,7 +786,8 @@ class GimmeAWSCreds(object):
             profile_name = 'default'
         elif cred_profile.lower() == 'role':
             profile_name = naming_data['role']
-        elif cred_profile.lower() == 'acc-role':
+        elif cred_profile.lower() in ['acc-role', 'acc:role']:
+            delimiter = cred_profile[3]
             account = naming_data['account']
             role_name = naming_data['role']
             path = naming_data['path']
@@ -796,7 +797,7 @@ class GimmeAWSCreds(object):
                     account = account_alias
             if include_path == 'True':
                 role_name = ''.join([path, role_name])
-            profile_name = '-'.join([account,
+            profile_name = delimiter.join([account,
                                      role_name])
         else:
             profile_name = cred_profile
