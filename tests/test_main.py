@@ -177,6 +177,19 @@ class TestMain(unittest.TestCase):
         include_path = 'False'
         self.assertEqual(creds.get_profile_name(cred_profile, include_path, naming_data, resolve_alias, role), "my-org-master-administrator")
 
+    def test_get_profile_name_acc_colon_role_resolve_alias_do_not_include_paths(self):
+        "Testing the acc:role, with alias resolution, and not including full role path"
+        creds = GimmeAWSCreds()
+        naming_data = {'account': '123456789012', 'role': 'administrator', 'path': '/administrator/'}
+        role = RoleSet(idp='arn:aws:iam::123456789012:saml-provider/my-okta-provider',
+                       role='arn:aws:iam::123456789012:role/administrator/administrator',
+                       friendly_account_name='Account: my-org-master (123456789012)',
+                       friendly_role_name='administrator/administrator')
+        cred_profile = 'acc:role'
+        resolve_alias = 'True'
+        include_path = 'False'
+        self.assertEqual(creds.get_profile_name(cred_profile, include_path, naming_data, resolve_alias, role), "my-org-master:administrator")
+
     def test_get_profile_accrole_name_do_not_resolve_alias_do_not_include_paths(self):
         "Testing the acc-role, without alias resolution, and not including full role path"
         creds = GimmeAWSCreds()
