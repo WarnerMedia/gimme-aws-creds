@@ -1,7 +1,7 @@
 # Gimme AWS Creds
 
 [![][license img]][license]
-[![Build Status](https://travis-ci.org/Nike-Inc/gimme-aws-creds.svg?branch=master)](https://travis-ci.org/Nike-Inc/gimme-aws-creds)
+[![Upstream Build Status](https://travis-ci.org/Nike-Inc/gimme-aws-creds.svg?branch=master)](https://travis-ci.org/Nike-Inc/gimme-aws-creds)
 
 gimme-aws-creds is a CLI that utilizes an [Okta](https://www.okta.com/) IdP via SAML to acquire temporary AWS credentials via AWS STS.
 
@@ -17,24 +17,16 @@ Python 3
 
 ### Optional
 
-[Gimme-creds-lambda](https://github.com/Nike-Inc/gimme-aws-creds/tree/master/lambda) can be used as a proxy to the Okta APIs needed by gimme-aws-creds.  This removes the requirement of an Okta API key.  Gimme-aws-creds authenticates to gimme-creds-lambda using OpenID Connect and the lambda handles all interactions with the Okta APIs.  Alternately, you can set the `OKTA_API_KEY` environment variable and the `gimme_creds_server` configuration value to 'internal' to call the Okta APIs directly from gimme-aws-creds.
+[Gimme-creds-lambda](https://github.com/warnermedia/gimme-aws-creds/tree/master/lambda) can be used as a proxy to the Okta APIs needed by gimme-aws-creds.  This removes the requirement of an Okta API key.  Gimme-aws-creds authenticates to gimme-creds-lambda using OpenID Connect and the lambda handles all interactions with the Okta APIs.  Alternately, you can set the `OKTA_API_KEY` environment variable and the `gimme_creds_server` configuration value to 'internal' to call the Okta APIs directly from gimme-aws-creds.
 
 ## Installation
 
 This is a Python 3 project.
 
-Install/Upgrade from PyPi:
-
-```bash
-pip3 install --upgrade gimme-aws-creds
-```
-
-__OR__
-
 Install/Upgrade the latest gimme-aws-creds package direct from GitHub:
 
 ```bash
-pip3 install --upgrade git+git://github.com/Nike-Inc/gimme-aws-creds.git
+pip3 install --upgrade git+git://github.com/WarnerMedia/gimme-aws-creds.git
 ```
 
 __OR__
@@ -44,15 +36,6 @@ Install the gimme-aws-creds package if you have already cloned the source:
 ```bash
 python3 setup.py install
 ```
-
-__OR__
-
-Use homebrew
-
-```bash
-brew install gimme-aws-creds
-```
-
 __OR__
 
 Build the docker image locally:
