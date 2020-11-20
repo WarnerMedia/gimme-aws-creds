@@ -757,6 +757,21 @@ class GimmeAWSCreds(object):
         cred_profile = self.conf_dict['cred_profile']
         resolve_alias = self.conf_dict['resolve_aws_alias']
         include_path = self.conf_dict.get('include_path')
+
+        # get_profile_name doesn't have access to credentials, so do this here
+        if resolve_alias:
+            if role.friendly_account_name == 'SingleAccountName':
+                try:
+                    iam = boto3.client('iam', aws_access_key_id = aws_creds.get('AccessKeyId', ''),
+                                              aws_secret_access_key = aws_creds.get('SecretAccessKey', ''),
+                                              aws_session_token =  aws_creds.get('SessionToken', ''))
+                    account_alias = iam.list_account_aliases()['AccountAliases'][0]
+                    if account_alias:
+                        naming_data['account'] = account_alias
+                except (ClientError, IndexError, KeyError):
+                    # just leave the name alone if we couldn't get the alias
+                    pass
+
         profile_name = self.get_profile_name(cred_profile, include_path, naming_data, resolve_alias, role)
 
         return {
