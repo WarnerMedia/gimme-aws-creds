@@ -93,7 +93,7 @@ class AwsResolver(object):
         if not roles:
             role = next(iter(table))
             idp = table[role]
-            result.append(commondef.RoleSet(idp=idp, role=role, friendly_account_name='SingleAccountName', friendly_role_name='SingleRole'))
+            result.append(commondef.RoleSet(idp=idp, role=role, friendly_account_name='SingleAccountName', friendly_role_name=role.split('/')[-1]))
             return result
 
         for role_item in roles:
