@@ -40,7 +40,7 @@ class GimmeAWSCreds(object):
     """
        This is a CLI tool that gets temporary AWS credentials
        from Okta based on the available AWS Okta Apps and roles
-       assigned to the user. 
+       assigned to the user.
     """
     resolver = DefaultResolver()
     envvar_list = [
@@ -496,18 +496,18 @@ class GimmeAWSCreds(object):
 
     def set_okta_platform(self, okta_platform):
         self._cache['okta_platform'] = okta_platform
-    
+
     @property
     def okta_platform(self):
         if 'okta_platform' in self._cache:
             return self._cache['okta_platform']
-        
+
         # Treat this domain as classic, even if it's OIE
         if self.config.force_classic == True or self.conf_dict.get('force_classic') == "True":
             self.ui.message('Okta Classic login flow enabled')
             self.set_okta_platform('classic')
             return 'classic'
-        
+
         response = requests.get(
             self.okta_org_url + '/.well-known/okta-organization',
             headers={
@@ -666,10 +666,10 @@ class GimmeAWSCreds(object):
                     id_token=False,
                     scopes=['openid']
                 )
-                
+
                 # auth_session isn't needed when using gimme_creds_lambda and Okta classic
                 self.set_auth_session(None)
-                
+
             elif self.okta_platform == 'identity_engine':
                 auth_result = self.auth_session
 
@@ -866,8 +866,7 @@ class GimmeAWSCreds(object):
             self.handle_setup_fido_authenticator()
         self.handle_action_store_json_creds()
         self.handle_action_list_roles()
-            
-  
+
         # for each data item, if we have an override on output, prioritize that
         # if we do not, prioritize writing credentials to file if that is in our
         # configuration. If we are not writing to a credentials file, use whatever
