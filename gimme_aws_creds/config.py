@@ -661,4 +661,4 @@ class Config(object):
         """
         if not profile_config and conf_profile == default_section:
             raise errors.GimmeAWSCredsError(
-                'DEFAULT profile is missing! This is profile is required when not using --profile')
+                'DEFAULT profile is missing! This profile is required when not using --profile')
