@@ -111,18 +111,11 @@ class WebAuthnClient(object):
         options = PublicKeyCredentialCreationOptions(self._rp, user, self._challenge, pub_key_cred_params,
                                                      timeout=self._timeout_ms)
 
-        pin = self._get_pin_from_client(client)
-<<<<<<< HEAD
         attestation_res = client.make_credential(options, event=self._event,
                                                  on_keepalive=self.on_keepalive,
                                                  pin=pin)
 
         self._attestation, self._client_data = attestation_res.attestation_object, attestation_res.client_data
-=======
-        self._attestation, self._client_data = client.make_credential(options, event=self._event,
-                                                                      on_keepalive=self.on_keepalive,
-                                                                      pin=pin)
->>>>>>> a105e8e (merge version 2.4.0 changes from Nike)
         self._event.set()
 
     def _run_in_thread(self, method, *args, **kwargs):
@@ -154,7 +147,6 @@ class WebAuthnClient(object):
         # Prompt for PIN if needed
         pin = getpass("Please enter PIN: ")
         return pin
-<<<<<<< HEAD
 
     @staticmethod
     def _get_user_verification_requirement_from_client(client):
@@ -162,5 +154,3 @@ class WebAuthnClient(object):
             return None
 
         return UserVerificationRequirement.PREFERRED
-=======
->>>>>>> a105e8e (merge version 2.4.0 changes from Nike)
