@@ -111,6 +111,7 @@ class WebAuthnClient(object):
         options = PublicKeyCredentialCreationOptions(self._rp, user, self._challenge, pub_key_cred_params,
                                                      timeout=self._timeout_ms)
 
+        pin = self._get_pin_from_client(client)
         attestation_res = client.make_credential(options, event=self._event,
                                                  on_keepalive=self.on_keepalive,
                                                  pin=pin)
