@@ -10,4 +10,4 @@ test: docker-build
 standalone: init bin/gimme-aws-creds requirements.txt standalone/README.txt
 	pyinstaller --collect-all=fido2 --onefile bin/gimme-aws-creds
 	cp standalone/README.txt dist
-	cd dist && zip gimmme-aws-creds.zip *
+	cd dist && zip gimme-aws-creds.zip *
