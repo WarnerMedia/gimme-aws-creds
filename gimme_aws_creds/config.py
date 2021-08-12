@@ -444,6 +444,7 @@ class Config(object):
             "The AWS credential profile defines which profile is used to store the temp AWS creds.\n"
             "If set to 'role' then a new profile will be created matching the role name assumed by the user.\n"
             "If set to 'acc-role' or 'acc:role' then a new profile will be created matching the role name assumed by the user, but prefixed with account alias or number and the given delimiter to avoid collisions.\n"
+            "If set to 'acc' then a new profile will be created matching the account number (or alias if resolve is set to True)\n"
             "If set to 'default' then the temp creds will be stored in the default profile\n"
             "If set to any other value, the name of the profile will match that value."
         )
@@ -451,7 +452,7 @@ class Config(object):
         cred_profile = self._get_user_input(
             "AWS Credential Profile", default_entry)
 
-        if cred_profile.lower() in ['default', 'role', 'acc-role', 'acc:role']:
+        if cred_profile.lower() in ['default', 'role', 'acc', 'acc-role', 'acc:role']:
             cred_profile = cred_profile.lower()
 
         return cred_profile

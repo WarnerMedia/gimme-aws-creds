@@ -771,6 +771,13 @@ class GimmeAWSCreds(object):
             profile_name = 'default'
         elif cred_profile.lower() == 'role':
             profile_name = naming_data['role']
+        elif cred_profile.lower() == 'acc':
+            account = naming_data['account']
+            if resolve_alias == 'True':
+                account_alias = self._get_alias_from_friendly_name(role.friendly_account_name)
+                if account_alias:
+                    account = account_alias
+            profile_name = account
         elif cred_profile.lower() in ['acc-role', 'acc:role']:
             delimiter = cred_profile[3]
             account = naming_data['account']
