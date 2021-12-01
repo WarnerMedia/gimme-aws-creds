@@ -314,8 +314,10 @@ class Config(object):
             okta_org_url = self._get_user_input("Okta URL for your organization", default_entry).strip('/')
             # Validate that okta_org_url is a well formed okta URL
             url_parse_results = urlparse(okta_org_url)
+            scheme, host = url_parse_results.scheme, url_parse_results.netloc
+            valid_domains = ["okta.com", "oktapreview.com", "okta-emea.com"]
 
-            if url_parse_results.scheme == "https" and "okta.com" or "oktapreview.com" or "okta-emea.com" in okta_org_url:
+            if scheme == "https" and any([host.endswith(domain) for domain in valid_domains]):
                 okta_org_url_valid = True
             else:
                 ui.default.error(
