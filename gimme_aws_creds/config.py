@@ -317,7 +317,7 @@ class Config(object):
             scheme, host = url_parse_results.scheme, url_parse_results.netloc
             valid_domains = ["okta.com", "oktapreview.com", "okta-emea.com"]
 
-            if scheme == "https" and any([host.endswith(domain) for domain in valid_domains]):
+            if scheme == "https" and any([host.endswith("."+domain) for domain in valid_domains]):
                 okta_org_url_valid = True
             else:
                 ui.default.error(
