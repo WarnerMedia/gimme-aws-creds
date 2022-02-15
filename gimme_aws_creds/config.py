@@ -55,6 +55,7 @@ class Config(object):
         self.action_output_format = False
         self.output_format = 'export'
         self.roles = []
+        self.filter_selection = ""
 
         if self.ui.environ.get("OKTA_USERNAME") is not None:
             self.username = self.ui.environ.get("OKTA_USERNAME")
@@ -105,6 +106,15 @@ class Config(object):
                  'can be regex in format /<pattern>/. '
                  'for example: arn:aws:iam::123456789012:role/Admin,/:210987654321:/ '
                  'would match both account 123456789012 by ARN and 210987654321 by regexp'
+        )
+        parser.add_argument(
+            '--filter-selection', '-f',
+            help='If set, the input will be used to filter the list of roles presented to the user. '
+                 'The filter acts on the so called \'friendly_account_name\' associated with each role. '
+                 'The friendly account name contains the account name and number. '
+                 'For example: \'nonprod\' would match any roles where the text \'nonprod\' is found. '
+                 'If only one match is found, it will be auto selected and credentials generated. '
+                 'If no results are found, the program exits.'
         )
         parser.add_argument(
             '--resolve', '-r',
@@ -173,6 +183,8 @@ class Config(object):
             self.output_format = args.output_format
         if args.roles is not None:
             self.roles = [role.strip() for role in args.roles.split(',') if role.strip()]
+        if args.filter_selection is not None:
+            self.filter_selection = args.filter_selection.strip()
         self.conf_profile = args.profile or 'DEFAULT'
 
     def _handle_config(self, config, profile_config, include_inherits = True):
@@ -432,6 +444,7 @@ class Config(object):
             "The AWS credential profile defines which profile is used to store the temp AWS creds.\n"
             "If set to 'role' then a new profile will be created matching the role name assumed by the user.\n"
             "If set to 'acc-role' or 'acc:role' then a new profile will be created matching the role name assumed by the user, but prefixed with account alias or number and the given delimiter to avoid collisions.\n"
+            "If set to 'acc' then a new profile will be created matching the account number (or alias if resolve is set to True)\n"
             "If set to 'default' then the temp creds will be stored in the default profile\n"
             "If set to any other value, the name of the profile will match that value."
         )
@@ -439,7 +452,7 @@ class Config(object):
         cred_profile = self._get_user_input(
             "AWS Credential Profile", default_entry)
 
-        if cred_profile.lower() in ['default', 'role', 'acc-role', 'acc:role']:
+        if cred_profile.lower() in ['default', 'role', 'acc', 'acc-role', 'acc:role']:
             cred_profile = cred_profile.lower()
 
         return cred_profile
