@@ -34,7 +34,7 @@ __OR__
 Install/Upgrade the latest gimme-aws-creds package direct from GitHub:
 
 ```bash
-pip3 install --upgrade git+git://github.com/Nike-Inc/gimme-aws-creds.git
+pip3 install --upgrade git+https://github.com/Nike-Inc/gimme-aws-creds.git
 ```
 
 __OR__
