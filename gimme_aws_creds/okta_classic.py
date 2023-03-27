@@ -51,7 +51,6 @@ class OktaClassicClient(object):
         :type gac_ui: ui.UserInterface
         :param okta_org_url: Base URL string for Okta IDP.
         :param verify_ssl_certs: Enable/disable SSL verification
-        :param device_token: Device Token value for Okta device ID
         """
         self.ui = gac_ui
         self._okta_org_url = okta_org_url

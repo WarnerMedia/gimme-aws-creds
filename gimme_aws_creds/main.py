@@ -493,6 +493,13 @@ class GimmeAWSCreds(object):
     @property
     def output_format(self):
         return self.conf_dict.setdefault('output_format', self.config.output_format)
+    
+    @property
+    def okta_platform(self):
+        ret = self.conf_dict.get('okta_platform')
+        if not ret:
+            raise errors.GimmeAWSCredsError('No Okta Platform in configuration.  Try running --config again.')
+        return ret
 
     def set_okta_platform(self, okta_platform):
         self._cache['okta_platform'] = okta_platform

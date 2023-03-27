@@ -31,6 +31,7 @@ class Config(object):
         """
         :type gac_ui: ui.UserInterface
         """
+        self._okta_platform = 'classic'
         self.ui = gac_ui
         self.FILE_ROOT = self.ui.HOME
         self.OKTA_CONFIG = self.ui.environ.get(
@@ -226,6 +227,7 @@ class Config(object):
            Prompts user for config details for the okta_aws_login tool.
            Either updates existing config file or creates new one.
            Config Options:
+                okta_platform = Platform of your Okta instance: 'classic' or 'identity_engine'
                 okta_org_url = Okta URL
                 gimme_creds_server = URL of the gimme-creds-server or 'internal' for local processing or 'appurl' when app url available
                 client_id = OAuth Client ID - used for the gimme-creds-server in Okta classic and user authentication in Okta Identity Engine
@@ -245,6 +247,7 @@ class Config(object):
             self.conf_profile = self._get_conf_profile_name(self.conf_profile)
 
         defaults = {
+            'okta_platform': 'classic',
             'okta_org_url': '',
             'okta_auth_server': '',
             'client_id': '',
@@ -278,6 +281,7 @@ class Config(object):
 
         # Prompt user for config details and store in config_dict
         config_dict = defaults
+        config_dict['okta_platform'] = self._get_platform_entry(defaults['okta_platform'])
         config_dict['okta_org_url'] = self._get_org_url_entry(defaults['okta_org_url'])
         client_id_set = False
 
@@ -331,6 +335,30 @@ class Config(object):
         # write out the conf file
         with open(self.OKTA_CONFIG, 'w') as configfile:
             config.write(configfile)
+
+    def _get_platform_entry(self, default_entry):
+        """ Get and validate okta_platform """
+        ui.default.info("Enter the Okta platform for your organization. 'classic' or 'identity_engine'")
+        okta_platform_valid = False
+        okta_platform = default_entry
+
+        while okta_platform_valid is False:
+            okta_platform = self._get_user_input("Okta Platform", default_entry)
+            # Validate that okta_platform is in the list of possible platforms
+            validPlatforms = [
+                "classic",
+                "identity_engine"
+            ]
+
+            if okta_platform in validPlatforms:
+                okta_platform_valid = True
+            else:
+                ui.default.error(
+                    "Okta platform must be classic or identity_engine")
+
+        self._okta_platform = okta_platform
+
+        return okta_platform
 
     def _get_org_url_entry(self, default_entry):
         """ Get and validate okta_org_url """
