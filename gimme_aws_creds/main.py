@@ -493,6 +493,9 @@ class GimmeAWSCreds(object):
     @property
     def output_format(self):
         return self.conf_dict.setdefault('output_format', self.config.output_format)
+
+    def set_okta_platform(self, okta_platform):
+        self._cache['okta_platform'] = okta_platform
     
     @property
     def okta_platform(self):
@@ -511,14 +514,17 @@ class GimmeAWSCreds(object):
 
         if response.status_code == 200:
             if response_data['pipeline'] == 'v1':
-                ret = self._cache['okta_platform'] = 'classic'
+                ret = 'classic'
             elif response_data['pipeline'] == 'idx':
-                ret = self._cache['okta_platform'] = 'identity_engine'
+                ret = 'identity_engine'
+                if not self.conf_dict.get('client_id'):
+                    raise errors.GimmeAWSCredsError('OAuth Client ID is required for Okta Identity Engine domains.  Try running --config again.')
             else:
                 raise RuntimeError('Unknown Okta platform type: {}'.format(response_data['pipeline']))
         else:
             response.raise_for_status()
 
+        self.set_okta_platform(ret)
         return ret
 
     def set_okta_platform(self, okta_platform):
