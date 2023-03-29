@@ -496,9 +496,29 @@ class GimmeAWSCreds(object):
     
     @property
     def okta_platform(self):
-        ret = self.conf_dict.get('okta_platform')
-        if not ret:
-            raise errors.GimmeAWSCredsError('No Okta Platform in configuration.  Try running --config again.')
+        if 'okta_platform' in self._cache:
+            return self._cache['okta_platform']
+        
+        response = requests.get(
+            self.okta_org_url + '/.well-known/okta-organization',
+            headers={
+                'Accept': 'application/json',
+                'User-Agent': "gimme-aws-creds {}".format(version)
+            }
+        )
+
+        response_data = response.json()
+
+        if response.status_code == 200:
+            if response_data['pipeline'] == 'v1':
+                ret = self._cache['okta_platform'] = 'classic'
+            elif response_data['pipeline'] == 'idx':
+                ret = self._cache['okta_platform'] = 'identity_engine'
+            else:
+                raise RuntimeError('Unknown Okta platform type: {}'.format(response_data['pipeline']))
+        else:
+            response.raise_for_status()
+
         return ret
 
     def set_okta_platform(self, okta_platform):
