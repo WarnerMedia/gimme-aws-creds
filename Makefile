@@ -12,7 +12,7 @@ docker-build:
 	docker build -t gimme-aws-creds .
 
 test: docker-build
-	nose2 -vv tests
+	pytest -vv tests
 
 venv:
 	$(PYTHON) -mvenv ./venv
