@@ -257,17 +257,6 @@ aws_rolename = my-role
 
 ## Usage
 
-### App configuration in Okta Identity Engine
-
-To use gimme-aws-creds with an Okta Idnentity Engine domain, you must create a new OIDC Native Application and connect it to your AWS integration app(s).
-
-The OIDC Native Application requires Grant Types `Authorization Code`, `Device Authorization` , and `Token Exchange`. These settings are in the Okta Admin UI at `Applications > [the OIDC app] > General Settings > Grant type`.
-
-The pairing with the AWS Federation Application is achieved in the Fed app's Sign On Settings. These settings are in the Okta Admin UI at `Applications > [the AWS Fed app] > Sign On`. Make sure to set the `Allowed Web SSO Client` value to the Client ID of the OIDC Native Application. Repeat that setting for each AWS application you want to access with gimme-aws-creds.
-
-Finally, set the Client ID in gimme-aws-creds (`gimme-aws-creds --action-configure` or update the `client_id` parameter in your config file)
-
-
 **If you are not using gimme-creds-lambda nor using appurl settings, make sure you set the OKTA_API_KEY environment variable.**
 
 After running --action-configure, just run gimme-aws-creds. You will be prompted for the necessary information.
