@@ -2,7 +2,6 @@ ifdef OS
 	BIN    := Scripts
 	PYTHON := python
 	SEP := ;
-	SFX := .cmd
 else
 	BIN    := bin
 	PYTHON := python3
