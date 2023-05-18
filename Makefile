@@ -1,6 +1,8 @@
 ifdef OS
+	PYTHON := python
 	SEP := ;
 else
+	PYTHON := python3
 	SEP := :
 endif
 
