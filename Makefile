@@ -1,7 +1,7 @@
 ifdef OS
 	SEP := ;
 else
-  	SEP := :
+	SEP := :
 endif
 
 docker-build:
