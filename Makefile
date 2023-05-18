@@ -5,7 +5,7 @@ else
 endif
 
 init:
-	python -mpip install -r requirements_dev.txt
+	python3 -mpip install -r requirements_dev.txt
 
 docker-build:
 	docker build -t gimme-aws-creds .
