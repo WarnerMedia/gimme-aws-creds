@@ -6,7 +6,6 @@ else
 	BIN    := bin
 	PYTHON := python3
 	SEP := :
-	SFX :=
 endif
 
 docker-build:
