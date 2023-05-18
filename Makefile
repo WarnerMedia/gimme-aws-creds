@@ -1,7 +1,9 @@
 ifdef OS
+	BIN    := Scripts
 	PYTHON := python
 	SEP := ;
 else
+	BIN    := bin
 	PYTHON := python3
 	SEP := :
 endif
