@@ -502,12 +502,19 @@ class GimmeAWSCreds(object):
         if 'okta_platform' in self._cache:
             return self._cache['okta_platform']
         
+        # Treat this domain as classic, even if it's OIE
+        if self.config.force_classic == True or self.conf_dict.get('force_classic') == "True":
+            self.ui.message('Okta Classic login flow enabled')
+            self.set_okta_platform('classic')
+            return 'classic'
+        
         response = requests.get(
             self.okta_org_url + '/.well-known/okta-organization',
             headers={
                 'Accept': 'application/json',
                 'User-Agent': "gimme-aws-creds {}".format(version)
-            }
+            },
+            timeout=30
         )
 
         response_data = response.json()
