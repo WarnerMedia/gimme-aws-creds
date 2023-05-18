@@ -803,24 +803,31 @@ class GimmeAWSCreds(object):
         }
 
     def get_profile_name(self, cred_profile, include_path, naming_data, resolve_alias, role):
-        if cred_profile.lower() == 'default':
-            profile_name = 'default'
-        elif cred_profile.lower() == 'role':
-            profile_name = naming_data['role']
-        elif cred_profile.lower() == 'acc-role':
+        if cred_profile.lower() in [ 'default', 'acc-role', 'acc:role', 'role' ]:
+            cred_profile = cred_profile.lower()
+        if cred_profile == 'role':
+            cred_profile = '%r'
+        if cred_profile == 'acc-role':
+            cred_profile = '%a-%r'
+        if cred_profile == 'acc:role':
+            cred_profile = '%a:%r'
+
+        if '%' in cred_profile:
             account = naming_data['account']
-            role_name = naming_data['role']
-            path = naming_data['path']
             if resolve_alias == 'True':
                 account_alias = self._get_alias_from_friendly_name(role.friendly_account_name)
                 if account_alias:
                     account = account_alias
+            role_name = naming_data['role']
+            path = naming_data['path']
             if include_path == 'True':
                 role_name = ''.join([path, role_name])
-            profile_name = '-'.join([account,
-                                     role_name])
+            profile_name = cred_profile.replace('%a', account)
+            profile_name = profile_name.replace('%p', path)
+            profile_name = profile_name.replace('%r', role_name)
         else:
             profile_name = cred_profile
+
         return profile_name
 
     def iter_selected_aws_credentials(self):

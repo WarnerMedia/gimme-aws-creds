@@ -200,7 +200,7 @@ class Config(object):
         # Check to see if config file exists, if not complain and exit
         # If config file does exist return config dict from file
         if os.path.isfile(self.OKTA_CONFIG):
-            config = configparser.ConfigParser()
+            config = configparser.ConfigParser(interpolation=None)
             config.read(self.OKTA_CONFIG)
 
             try:
@@ -233,7 +233,7 @@ class Config(object):
                 include_path - (optional) includes that full role path to the role name for profile
 
         """
-        config = configparser.ConfigParser()
+        config = configparser.ConfigParser(interpolation=None)
         if self.action_configure:
             self.conf_profile = self._get_conf_profile_name(self.conf_profile)
 
@@ -302,7 +302,7 @@ class Config(object):
         self.write_config_file(config_dict)
 
     def write_config_file(self, config_dict):
-        config = configparser.ConfigParser()
+        config = configparser.ConfigParser(interpolation=None)
         config.read(self.OKTA_CONFIG)
         config[self.conf_profile] = config_dict
 
@@ -445,17 +445,23 @@ class Config(object):
     def _get_cred_profile(self, default_entry):
         """sets the aws credential profile name"""
         ui.default.message(
-            "The AWS credential profile defines which profile is used to store the temp AWS creds.\n"
-            "If set to 'role' then a new profile will be created matching the role name assumed by the user.\n"
-            "If set to 'acc-role' then a new profile will be created matching the role name assumed by the user, but prefixed with account number to avoid collisions.\n"
-            "If set to 'default' then the temp creds will be stored in the default profile\n"
-            "If set to any other value, the name of the profile will match that value."
+            "This determines the name of the AWS credential profile under which to store\n"
+            "the temporary AWS credentials. Within the provided string, the sequence '%a'\n"
+            "will be replaced by the AWS account number (or alias if resolve_aws_alias is\n"
+            "set); the sequence '%r' will likewise be replaced by the role name. If the\n"
+            "'include_path' configuration flag is set, the expansion of '%r' will include\n"
+            "the full path to the role; regardless of that setting, the path can also be\n"
+            "which can also be included on its own as '%p'.\n\n"
+            "For backward compatibility, a few special case-insensitive keywords are also\n"
+            "recognized: 'default' means the default profile, 'role' is equivalent to '%r'\n"
+            "'acc-role' to '%a-%r', and 'acc:role' to '%a:%r'. Otherwise, the provided\n"
+            "string will be used directly as the profile name.\n"
         )
 
         cred_profile = self._get_user_input(
             "AWS Credential Profile", default_entry)
 
-        if cred_profile.lower() in ['default', 'role', 'acc-role']:
+        if cred_profile.lower() in ['default', 'role', 'acc-role', 'acc:role']:
             cred_profile = cred_profile.lower()
 
         return cred_profile
