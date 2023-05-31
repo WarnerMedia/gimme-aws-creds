@@ -260,7 +260,6 @@ class Config(object):
             'preferred_mfa_type': '',
             'remember_device': 'n',
             'aws_default_duration': '3600',
-            'device_token': '',
             'output_format': 'export',
             'force_classic': '',
             'open_browser': ''
