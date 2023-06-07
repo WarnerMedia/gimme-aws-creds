@@ -1,11 +1,12 @@
 ifdef OS
+	BIN    := Scripts
+	PYTHON := python
 	SEP := ;
 else
-  	SEP := :
+	BIN    := bin
+	PYTHON := python3
+	SEP := :
 endif
-
-init:
-	python -mpip install -r requirements_dev.txt
 
 docker-build:
 	docker build -t gimme-aws-creds .
@@ -13,7 +14,14 @@ docker-build:
 test: docker-build
 	nosetests -vv tests
 
+venv:
+	$(PYTHON) -mvenv ./venv
+
+init:	venv
+	./venv/$(BIN)/$(PYTHON) -mpip install -r requirements_dev.txt
+
+
 exe: init
-	python -mpip install .
-	$(eval FIDODIR := $(shell python -c "import fido2;from os import path as op;print(op.dirname(fido2.__file__))"))
-	pyinstaller -F --hidden-import=gimme_aws_creds --add-data "$(FIDODIR)/public_suffix_list.dat$(SEP)fido2" bin/gimme-aws-creds
+	./venv/$(BIN)/$(PYTHON) -mpip install .
+	$(eval FIDODIR := $(shell ./venv/$(BIN)/$(PYTHON) -c "import fido2;from os import path as op;print(op.dirname(fido2.__file__))"))
+	./venv/$(BIN)/$(PYTHON) -mPyInstaller -F --hidden-import=gimme_aws_creds --add-data "$(FIDODIR)/public_suffix_list.dat$(SEP)fido2" bin/gimme-aws-creds
