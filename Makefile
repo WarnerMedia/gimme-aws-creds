@@ -28,4 +28,4 @@ exe: init
 	./venv/$(BIN)/$(PYTHON) -mPyInstaller -F --hidden-import=gimme_aws_creds --add-data "$(FIDODIR)/public_suffix_list.dat$(SEP)fido2" bin/gimme-aws-creds
 
 clean:
-	rm -rf build venv 
+	rm -rf build dist venv 
