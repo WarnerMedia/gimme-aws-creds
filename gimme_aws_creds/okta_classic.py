@@ -1069,45 +1069,6 @@ class OktaClassicClient(object):
             return decode(state_token_re.group(1), "unicode-escape")
 
         saml_soup = BeautifulSoup(http_res.text, "html.parser")
-        mfa_string = (
-            'Dodatečné ověření',
-            'Ekstra verificering',
-            'Zusätzliche Bestätigung',
-            'Πρόσθετη επαλήθευση',
-            'Extra Verification',
-            'Verificación adicional',
-            'Lisätodennus',
-            'Vérification supplémentaire',
-            'Extra ellenőrzés',
-            'Verifikasi Tambahan',
-            'Verifica aggiuntiva',
-            '追加認証',
-            '추가 확인',
-            'Penentusahan Tambahan',
-            'Ekstra verifisering',
-            'Extra verificatie',
-            'Dodatkowa weryfikacja',
-            'Verificação extra',
-            'Verificare suplimentară',
-            'Дополнительная проверка',
-            'Extra verifiering',
-            'การตรวจสอบพิเศษ',
-            'Ekstra Doğrulama',
-            'Додаткова верифікація',
-            'Xác minh bổ sung',
-            '额外验证',
-            '額外驗證'
-        )
-
-        if hasattr(saml_soup.title, 'string') and saml_soup.title.string.endswith(mfa_string):
-            # extract the stateToken from the Javascript code in the page and step up to MFA
-            # noinspection PyTypeChecker
-            state_token = decode(re.search(r"var stateToken = '(.*)';", http_res.text).group(1), "unicode-escape")
-            return state_token
-
-========
->>>>>>>> v2.7.1:gimme_aws_creds/okta_classic.py
->>>>>>> v2.7.1
         for tag in saml_soup.find_all('body'):
             # extract the stateToken from response (form action) instead of javascript variable
             # noinspection PyTypeChecker
