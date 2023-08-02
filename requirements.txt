@@ -7,4 +7,3 @@ okta>=0.0.4,<1.0.0
 ctap-keyring-device>=1.0.6
 pyjwt>=2.4.0,<3.0.0
 urllib3>=1.26.0,<2.0.0
-pyinstaller
