@@ -4,6 +4,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.DS_Store
 
 # nix flake init -t template#python
 .direnv
