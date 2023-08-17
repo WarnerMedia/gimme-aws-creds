@@ -37,11 +37,10 @@ from .errors import GimmeAWSCredsMFAEnrollStatus
 from .registered_authenticators import RegisteredAuthenticators
 
 
-class OktaClient(object):
+class OktaClassicClient(object):
     """
        The Okta Client Class performs the necessary API
-       calls to Okta to get temporary AWS credentials. An
-       Okta API key and URL must be provided.
+       calls to an Okta Classic domain to get temporary AWS credentials.
     """
 
     KEYRING_SERVICE = 'gimme-aws-creds'
@@ -52,6 +51,7 @@ class OktaClient(object):
         :type gac_ui: ui.UserInterface
         :param okta_org_url: Base URL string for Okta IDP.
         :param verify_ssl_certs: Enable/disable SSL verification
+        :param device_token: Device Token value for Okta device ID
         """
         self.ui = gac_ui
         self._okta_org_url = okta_org_url
@@ -80,7 +80,7 @@ class OktaClient(object):
         self.device_token = device_token
 
         retries = Retry(total=5, backoff_factor=1,
-                        method_whitelist=['GET', 'POST'])
+                        allowed_methods=['GET', 'POST'])
         self._http_client.mount('https://', HTTPAdapter(max_retries=retries))
 
     @property
@@ -287,6 +287,13 @@ class OktaClient(object):
             headers=self._get_headers(),
             verify=self._verify_ssl_certs
         )
+
+        # Passing the stateToken to the Authentication API for step-up auth doesn't work in OIE
+        if state_token is not None and response.status_code == 401:
+            raise errors.GimmeAWSCredsError(
+                "LOGIN ERROR: Step-up authetication is not supported when using the '--force_classic' parameter", 2
+            )
+
         response.raise_for_status()
         return {'stateToken': state_token, 'apiResponse': response.json()}
 
@@ -382,6 +389,25 @@ class OktaClient(object):
         response.raise_for_status()
 
         self.ui.info("A verification code has been sent to " + factor['profile']['phoneNumber'])
+        response_data = response.json()
+
+        if 'stateToken' in response_data:
+            return {'stateToken': response_data['stateToken'], 'apiResponse': response_data}
+        if 'sessionToken' in response_data:
+            return {'stateToken': None, 'sessionToken': response_data['sessionToken'], 'apiResponse': response_data}
+
+    def _login_send_email(self, state_token, factor):
+        """ Send email message for second factor authentication"""
+        response = self._http_client.post(
+            factor['_links']['verify']['href'],
+            params={'rememberDevice': self._remember_device},
+            json={'stateToken': state_token},
+            headers=self._get_headers(),
+            verify=self._verify_ssl_certs
+        )
+        response.raise_for_status()
+
+        self.ui.info("A verification code has been sent to " + factor['profile']['email'])
         response_data = response.json()
 
         if 'stateToken' in response_data:
@@ -554,6 +580,8 @@ class OktaClient(object):
             return self._login_send_sms(state_token, factor)
         elif factor['factorType'] == 'call':
             return self._login_send_call(state_token, factor)
+        elif factor['factorType'] == 'email':
+            return self._login_send_email(state_token, factor)
         elif factor['factorType'] == 'token:software:totp':
             return self._login_input_mfa_challenge(state_token, factor['_links']['verify']['href'])
         elif factor['factorType'] == 'token':
@@ -627,6 +655,7 @@ class OktaClient(object):
         verify = FactorU2F(self.ui, app_id, nonce, credential_id)
         try:
             client_data, signature = verify.verify()
+            self.ui.notify("Received U2F token response.")
         except Exception:
             signature = b'fake'
             client_data = b'fake'
@@ -662,6 +691,7 @@ class OktaClient(object):
         # noinspection PyBroadException
         try:
             client_data, assertion = webauthn_client.verify()
+            self.ui.notify("Received WebAuthn token response")
         except Exception:
             client_data = b'fake'
             assertion = FakeAssertion()
@@ -688,7 +718,7 @@ class OktaClient(object):
         else:
             return {'stateToken': None, 'sessionToken': None, 'apiResponse': response_data}
 
-    def get_saml_response(self, url):
+    def get_saml_response(self, url, auth_session = None):
         """ return the base64 SAML value object from the SAML Response"""
         response = self._http_client.get(url, verify=self._verify_ssl_certs)
         response.raise_for_status()
@@ -834,6 +864,8 @@ class OktaClient(object):
             return "Okta Verify App: " + factor['profile']['deviceType'] + ": " + factor['profile']['name']
         elif factor['factorType'] == 'sms':
             return factor['factorType'] + ": " + factor['profile']['phoneNumber']
+        elif factor['factorType'] == 'email':
+            return factor['factorType'] + ": " + factor['profile']['email']
         elif factor['factorType'] == 'call':
             return factor['factorType'] + ": " + factor['profile']['phoneNumber']
         elif factor['factorType'] == 'token:software:totp':
@@ -888,7 +920,7 @@ class OktaClient(object):
 
             if self.KEYRING_ENABLED:
                 # If the OS supports a keyring, offer to save the password
-                if self.ui.input("Do you want to save this password in the keyring? (y/N) ") == 'y':
+                if self.ui.input("Do you want to save this password in the keyring? (y/N) ").lower() == 'y':
                     try:
                         keyring.set_password(self.KEYRING_SERVICE, username, password)
                         self.ui.info("Password for {} saved in keyring.".format(username))
@@ -1031,50 +1063,16 @@ class OktaClient(object):
 
     @staticmethod
     def _extract_state_token_from_http_response(http_res):
+        # extract the stateToken from a javascript variable
+        state_token_re =  re.search(r"var stateToken = '(.*)';", http_res.text)
+        if state_token_re is not None:
+            return decode(state_token_re.group(1), "unicode-escape")
+
         saml_soup = BeautifulSoup(http_res.text, "html.parser")
-        mfa_string = (
-            'Dodatečné ověření',
-            'Ekstra verificering',
-            'Zusätzliche Bestätigung',
-            'Πρόσθετη επαλήθευση',
-            'Extra Verification',
-            'Verificación adicional',
-            'Lisätodennus',
-            'Vérification supplémentaire',
-            'Extra ellenőrzés',
-            'Verifikasi Tambahan',
-            'Verifica aggiuntiva',
-            '追加認証',
-            '추가 확인',
-            'Penentusahan Tambahan',
-            'Ekstra verifisering',
-            'Extra verificatie',
-            'Dodatkowa weryfikacja',
-            'Verificação extra',
-            'Verificare suplimentară',
-            'Дополнительная проверка',
-            'Extra verifiering',
-            'การตรวจสอบพิเศษ',
-            'Ekstra Doğrulama',
-            'Додаткова верифікація',
-            'Xác minh bổ sung',
-            '额外验证',
-            '額外驗證'
-        )
-
-        if hasattr(saml_soup.title, 'string') and saml_soup.title.string.endswith(mfa_string):
-            # extract the stateToken from the Javascript code in the page and step up to MFA
-            # noinspection PyTypeChecker
-            state_token = decode(re.search(r"var stateToken = '(.*)';", http_res.text).group(1), "unicode-escape")
-            return state_token
-
         for tag in saml_soup.find_all('body'):
-            # checking all the tags in body tag for Extra Verification string
-            if re.search(r"Extra Verification", tag.text, re.IGNORECASE):
-                # extract the stateToken from response (form action) instead of javascript variable
-                # noinspection PyTypeChecker
-                pre_state_token = decode(re.search(r"stateToken=(.*?[ \"])", http_res.text).group(1), "unicode-escape")
-                state_token = pre_state_token.rstrip('\"')
-                return state_token
-
-        return None
+            # extract the stateToken from response (form action) instead of javascript variable
+            # noinspection PyTypeChecker
+            state_token_re = re.search(r"stateToken=(.*?[ \"])", http_res.text)
+            if state_token_re is not None:
+                pre_state_token = decode(state_token_re.group(1), "unicode-escape")
+                return pre_state_token.rstrip('\"')
