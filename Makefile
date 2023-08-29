@@ -1,13 +1,13 @@
 ifdef OS
 	BIN    := Scripts
 	PYTHON := python
-	SEP := ;
-	RM  := rd /s /q
+	SEP    := ;
+	RM     := rd /s /q
 else
 	BIN    := bin
 	PYTHON := python3
-	SEP := :
-	RM  := rm -rf
+	SEP    := :
+	RM     := rm -rf
 endif
 
 docker-build: clean
