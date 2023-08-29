@@ -2,10 +2,12 @@ ifdef OS
 	BIN    := Scripts
 	PYTHON := python
 	SEP := ;
+	RM  := rd /s /q
 else
 	BIN    := bin
 	PYTHON := python3
 	SEP := :
+	RM  := rm -rf
 endif
 
 docker-build:
@@ -26,4 +28,4 @@ exe: init
 	./venv/$(BIN)/$(PYTHON) -mPyInstaller -F --hidden-import=gimme_aws_creds --add-data "$(FIDODIR)/public_suffix_list.dat$(SEP)fido2" bin/gimme-aws-creds
 
 clean:
-	rm -rf build dist venv 
+	$(RM) build dist venv
