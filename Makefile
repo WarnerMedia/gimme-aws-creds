@@ -10,7 +10,7 @@ else
 	RM  := rm -rf
 endif
 
-docker-build:
+docker-build: clean
 	docker build -t gimme-aws-creds .
 
 test: docker-build
