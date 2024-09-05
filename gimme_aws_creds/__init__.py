@@ -3,4 +3,4 @@ __all__ = [
   'okta_classic', 'okta_identity_engine', 'registered_authenticators', 'u2f',
   'webauthn'
 ]
-version = '2.7.2.1'
+version = '2.7.2.2'
