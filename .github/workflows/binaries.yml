@@ -102,6 +102,7 @@ jobs:
         shell: pwsh
         run: |
           choco install -y --no-progress openssl
+          $env:OPENSSL_DIR = "c:\Program Files\OpenSSL-Win64"
           ./venv/Scripts/python -m pip install --upgrade pip
           ./venv/Scripts/python -m pip install -r requirements_dev.txt
           ./venv/Scripts/python -m pip install .
