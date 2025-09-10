@@ -48,6 +48,7 @@ jobs:
           path: dist/gimme-aws-creds
       - name: Build exe for Windows
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           ./venv/Scripts/python -m pip install --upgrade pip
           ./venv/Scripts/python -m pip install -r requirements_dev.txt
