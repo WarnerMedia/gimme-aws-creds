@@ -24,7 +24,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
           architecture: 'x64'
       - name: Setup virtual env
         run: |
@@ -76,7 +76,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
           architecture: 'arm64'
       - name: Setup virtual env
         run: |
@@ -101,8 +101,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install -y --no-progress openssl
+          choco install -y --no-progress openssl rustup.install visualstudio2022buildtools
           $env:OPENSSL_DIR = "c:\Program Files\OpenSSL-Win64"
+          rustup toolchain add stable-aarch64-pc-windows-msvc
+
           ./venv/Scripts/python -m pip install --upgrade pip
           ./venv/Scripts/python -m pip install -r requirements_dev.txt
           ./venv/Scripts/python -m pip install .
