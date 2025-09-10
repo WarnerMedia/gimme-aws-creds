@@ -541,46 +541,6 @@ class GimmeAWSCreds(object):
         self.set_okta_platform(ret)
         return ret
 
-    def set_okta_platform(self, okta_platform):
-        self._cache['okta_platform'] = okta_platform
-
-    @property
-    def okta_platform(self):
-        if 'okta_platform' in self._cache:
-            return self._cache['okta_platform']
-
-        # Treat this domain as classic, even if it's OIE
-        if self.config.force_classic == True or self.conf_dict.get('force_classic') == "True":
-            self.ui.message('Okta Classic login flow enabled')
-            self.set_okta_platform('classic')
-            return 'classic'
-
-        response = requests.get(
-            self.okta_org_url + '/.well-known/okta-organization',
-            headers={
-                'Accept': 'application/json',
-                'User-Agent': "gimme-aws-creds {}".format(version)
-            },
-            timeout=30
-        )
-
-        response_data = response.json()
-
-        if response.status_code == 200:
-            if response_data['pipeline'] == 'v1':
-                ret = 'classic'
-            elif response_data['pipeline'] == 'idx':
-                ret = 'identity_engine'
-                if not self.conf_dict.get('client_id'):
-                    raise errors.GimmeAWSCredsError('OAuth Client ID is required for Okta Identity Engine domains.  Try running --config again.')
-            else:
-                raise RuntimeError('Unknown Okta platform type: {}'.format(response_data['pipeline']))
-        else:
-            response.raise_for_status()
-
-        self.set_okta_platform(ret)
-        return ret
-
     @property
     def okta_org_url(self):
         ret = self.conf_dict.get('okta_org_url')
@@ -825,6 +785,7 @@ class GimmeAWSCreds(object):
         cred_profile = self.conf_dict['cred_profile']
         resolve_alias = self.conf_dict['resolve_aws_alias']
         include_path = self.conf_dict.get('include_path')
+        profile_name = self.get_profile_name(cred_profile, include_path, naming_data, resolve_alias, role)
 
         # get_profile_name doesn't have access to credentials, so do this here
         if resolve_alias:
@@ -839,8 +800,6 @@ class GimmeAWSCreds(object):
                 except (ClientError, IndexError, KeyError):
                     # just leave the name alone if we couldn't get the alias
                     pass
-
-        profile_name = self.get_profile_name(cred_profile, include_path, naming_data, resolve_alias, role)
 
         return {
             'shared_credentials_file': self.AWS_CONFIG,
@@ -909,6 +868,7 @@ class GimmeAWSCreds(object):
             self.handle_setup_fido_authenticator()
         self.handle_action_store_json_creds()
         self.handle_action_list_roles()
+
 
         # for each data item, if we have an override on output, prioritize that
         # if we do not, prioritize writing credentials to file if that is in our
