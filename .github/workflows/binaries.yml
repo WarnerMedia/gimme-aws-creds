@@ -101,7 +101,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install openssl
+          choco install -y --no-progress openssl
           ./venv/Scripts/python -m pip install --upgrade pip
           ./venv/Scripts/python -m pip install -r requirements_dev.txt
           ./venv/Scripts/python -m pip install .
