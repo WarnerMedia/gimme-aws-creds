@@ -1,0 +1,58 @@
+name: Binaries
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master, fix/rebase-2.8.2 ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        arch: [x64, arm64]
+    runs-on: ${{ matrix.os }}
+    name: Build on ${{ matrix.os }} (${{ matrix.arch }})
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: ${{ matrix.arch }}
+      - name: Setup virtual env
+        run: |
+          python -m venv ./venv
+      - name: Install dependencies
+        run: |
+          ./venv/bin/python -m pip install --upgrade pip
+          ./venv/bin/python -m pip install -r requirements_dev.txt
+          ./venv/bin/python -m pip install .
+          ./venv/bin/python -m pip install pyinstaller
+      - name: Build exe for POSIX
+        if: runner.os != 'Windows'
+        run: |
+          fidodir=$(./venv/bin/python -c "import fido2;from os import path as op;print(op.dirname(fido2.__file__))")
+          omddir=$(./venv/bin/python -c "import orderedmultidict;from os import path as op;print(op.dirname(orderedmultidict.__file__))")
+          ./venv/bin/python -m PyInstaller -F --hidden-import=gimme_aws_creds --add-data "$fidodir/public_suffix_list.dat:fido2" --add-data "$omddir/__version__.py:orderedmultidict" bin/gimme-aws-creds
+      - name: Upload POSIX executable
+        if: runner.os != 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gimme-aws-creds-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/gimme-aws-creds
+      - name: Build exe for Windows
+        if: runner.os == 'Windows'
+        run: |
+          $fidodir = ./venv/Scripts/python -c "import fido2;from os import path as op;print(op.dirname(fido2.__file__))"
+          $omddir  = ./venv/Scripts/python -c "import orderedmultidict;from os import path as op;print(op.dirname(orderedmultidict.__file__))"
+          ./venv/Scripts/python -m PyInstaller -F --hidden-import=gimme_aws_creds --add-data "$fidodir/public_suffix_list.dat;fido2" --add-data "$omddir/__version__.py;orderedmultidict" bin/gimme-aws-creds
+      - name: Upload Windows executable
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gimme-aws-creds-windows-${{ matrix.arch }}
+          path: dist/gimme-aws-creds.exe
+
