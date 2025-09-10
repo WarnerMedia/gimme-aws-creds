@@ -6,7 +6,6 @@ from io import StringIO
 
 import requests
 import responses
-from nose.tools import assert_equals
 
 import gimme_aws_creds.common as commondef
 from gimme_aws_creds.aws import AwsResolver
@@ -209,4 +208,4 @@ window.location.href = regionFinder.getURLWithRegion();
         """Test handling users with just one role"""
         responses.add(responses.POST, 'https://signin.aws.amazon.com/saml', status=200, body=self.aws_signinpage)
         result = self.resolver._enumerate_saml_roles(self.saml, 'https://signin.aws.amazon.com/saml')
-        assert_equals(result[0], self.roles[0])
+        assert result[0] == self.roles[0]
