@@ -1,5 +1,6 @@
 """Unit tests for gimme_aws_creds"""
 import sys
+import os
 import unittest
 from contextlib import contextmanager
 from io import StringIO
@@ -11,7 +12,12 @@ import gimme_aws_creds.common as common_def
 from gimme_aws_creds.aws import AwsResolver
 from tests import read_fixture
 
-
+def read_fixture(file_name):
+    """Read a fixture file"""
+    fixture_path = os.path.join(os.path.dirname(__file__), 'fixtures', file_name)
+    with open(fixture_path, 'r', encoding='utf-8') as file:
+        return file.read()
+    
 class TestAwsResolver(unittest.TestCase):
     """Class to test Okta Client Class.
        Mock is used to mock external calls"""

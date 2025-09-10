@@ -522,7 +522,6 @@ class Config(object):
             "AWS Credential Profile", default_entry)
 
         cred_profile = profiles.Profile(cred_profile).canonicalize()
-
         return cred_profile
 
     def _get_aws_appname(self, default_entry):
@@ -684,4 +683,4 @@ class Config(object):
         """
         if not profile_config and conf_profile == default_section:
             raise errors.GimmeAWSCredsError(
-                'DEFAULT profile is missing! This is profile is required when not using --profile')
+                'DEFAULT profile is missing! This profile is required when not using --profile')

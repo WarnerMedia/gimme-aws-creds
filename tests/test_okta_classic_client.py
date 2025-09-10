@@ -1066,6 +1066,274 @@ class TestOktaClassicClient(unittest.TestCase):
         assert user_name == 'ann@example.com'
 
     @responses.activate
+    @patch('builtins.input', return_value='ann@example.com')
+    @patch('getpass.getpass', return_value='1234qwert')
+    @patch('gimme_aws_creds.webauthn.WebAuthnClient.make_credential', return_value=(b'', AttestationObject.create(
+        PackedAttestation.FORMAT, AuthenticatorData.create(
+            hashlib.sha256(b'example.okta.com').digest(),
+            AuthenticatorData.FLAG.USER_PRESENT | AuthenticatorData.FLAG.USER_VERIFIED | AuthenticatorData.FLAG.ATTESTED,
+            0, AttestedCredentialData.create(b'pasten-aag-uuid\0', b'pasten-credential-id', {3: -7})
+        ), {'alg': -7, 'sig': b'pasten-sig'}
+    )))
+    def test_authenticator_enrollment(self, mock_input, mock_password, mock_webauthn_client):
+        """ Tests a new webauthn authenticator enrollment """
+
+        setup_factors_response = """
+<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<div id="subcontainer" class="sign-in-common sign-in">
+    <div id="password-verification-challenge" class="sign-in-content rounded-6">
+        <h1>Please verify your password</h1>
+        <div id="creds.edit" class="ajax-form-editor mfa-challenge-form margin-top-0"><form id="creds.edit.form" class="v-form large-text-inputs clearfix leave-open-on-success" action="/user/verify_password" method="post"><div style="display:none;" class="infobox infobox-error verify-error" id="creds.edit.errors">
+                    <span class="icon error-16"></span>
+                    <p>Please review the form to correct the following errors:</p>
+                    <ul class="bullets">
+                        <li><span id="creds.password.error"></span></li>
+                    </ul>
+                </div>
+                <input type="hidden" class="hide" name="_xsrfToken" id="_xsrfToken" value="f94a83d1c56414a0395d340605dd4f16214ed36faa318200ae9826ef98bef4ad"/><label id="creds.password.label" for="creds.password" class="first l-txt normal margin-btm clearfix icon-16" cssErrorClass="error">Password<input id="creds.password" name="password" class="margin-top-10 challenge" tabindex="0" type="password" value="" autocomplete="off"/></label><div class="clearfix clear">
+                    <input value="Verify" name="m-save" type="button" id="creds.button.submit" class="ajax-form-submit save button allow-in-read-only allow-in-safe-mode float-l ie7-offset" tabindex="3" onclick="trackEvent('MFA Challenge')"/></div>
+            </form></div></div>
+</div>
+</body>
+</html>
+"""
+
+        second_factor_response = '''
+<!DOCTYPE html>
+<head>
+<title>Example, Inc - Extra Verification</title>
+</head>
+<body class="auth okta-container">
+<script type="text/javascript">function runLoginPage (fn) {var mainScript = document.createElement('script');mainScript.src = 'https://ok11static.oktacdn.com/assets/js/mvc/loginpage/initLoginPage.pack.88827f9bbcc5016901b032b2e26c64bf.js';mainScript.crossOrigin = 'anonymous';mainScript.integrity = 'sha384-vHr77eH+hWDyAa9aLN7uXxy3ek1uj1quPqidwdV8ljP3b4vpyZQZUtTOSmGQQOLR';document.getElementsByTagName('head')[0].appendChild(mainScript);fn && mainScript.addEventListener('load', function () { setTimeout(fn, 1) });}</script><script type="text/javascript">
+(function(){
+  var stateToken = '00Xg1Ci6KEli1338pWmP2gHUuYe0c_F4Nwd3fmoK9';
+  var authScheme = 'OAUTH2';
+  var webauthn = true;
+</body>
+</html>
+'''
+
+        auth_response = {
+            "stateToken": "00Wf8xZJ79mSoTYnJqXbvRegT8QB1EX1IBVk1TU7KI",
+            "type": "SESSION_STEP_UP",
+            "expiresAt": "2017-06-15T15:42:31.000Z",
+            "status": "SUCCESS",
+            "_embedded": {
+                "user": {
+                    "id": "00u8cakq7vQwtK7sR0h7",
+                    "profile": {
+                        "login": "ann@example.com",
+                        "firstName": "Ann",
+                        "lastName": "Pasten",
+                        "locale": "en",
+                        "timeZone": "America/Los_Angeles"
+                    }
+                },
+                "target": {
+                    "type": "APP",
+                    "name": "gimmecredsserver",
+                    "label": "Gimme-Creds-Server (Dev)",
+                    "_links": {
+                        "logo": {
+                            "name": "medium",
+                            "href": "https://op1static.oktacdn.com/bc/globalFileStoreRecord?id=gfsatgifysE8NG37F0h7",
+                            "type": "image/png"
+                        }
+                    }
+                }
+            },
+            "_links": {
+                "next": {
+                    "name": "original",
+                    "href": "https://example.okta.com/login/step-up/redirect?stateToken=00Wf8xZJ79mSoTYnJqXbvRegT8QB1EX1IBVk1TU7KI",
+                    "hints": {
+                        "allow": [
+                            "GET"
+                        ]
+                    }
+                }
+            }
+        }
+
+        setup_factor_response = '''
+<!DOCTYPE html>
+<head>
+<title>Example, Inc - Extra Verification</title>
+</head>
+<body class="auth okta-container">
+<script type="text/javascript">function runLoginPage (fn) {var mainScript = document.createElement('script');mainScript.src = 'https://ok11static.oktacdn.com/assets/js/mvc/loginpage/initLoginPage.pack.88827f9bbcc5016901b032b2e26c64bf.js';mainScript.crossOrigin = 'anonymous';mainScript.integrity = 'sha384-vHr77eH+hWDyAa9aLN7uXxy3ek1uj1quPqidwdV8ljP3b4vpyZQZUtTOSmGQQOLR';document.getElementsByTagName('head')[0].appendChild(mainScript);fn && mainScript.addEventListener('load', function () { setTimeout(fn, 1) });}</script><script type="text/javascript">
+(function(){
+  var stateToken = '13371Ci6KEli4Kopasten2gHUuYe0c_F4Nwd3fmoK9';
+  var authScheme = 'OAUTH2';
+  var webauthn = true;
+</body>
+</html>
+'''
+
+        introspect_response = {
+            "status": "MFA_ENROLL",
+            "_embedded": {
+                "user": {
+                    "id": "13373h4rlzEuUlUOY4x6",
+                    "passwordChanged": "2020-04-01T06:01:15.000Z",
+                    "profile": {
+                        "login": "ann@example.com",
+                        "firstName": "Ann",
+                        "lastName": "Pasten",
+                        "locale": "en",
+                        "timeZone": "America/Los_Angeles"
+                    }
+                },
+                "factors": [
+                    {
+                        "factorType": "webauthn",
+                        "provider": "FIDO",
+                        "vendorName": "FIDO",
+                        "_links": {
+                            "enroll": {
+                                "href": "https://example.okta.com/api/v1/authn/factors",
+                                "hints": {
+                                    "allow": [
+                                        "POST"
+                                    ]
+                                }
+                            }
+                        },
+                        "status": "NOT_SETUP",
+                        "enrollment": "OPTIONAL",
+                    }
+                ]
+            },
+        }
+
+        enrollment_response = {
+            "stateToken": "13371Ci6KEli4Kopasten2gHUuYe0c_F4Nwd3fmoK9",
+            "status": "MFA_ENROLL_ACTIVATE",
+            "_embedded": {
+                "user": {
+                    "id": "13373h4rlzEuUlUOY4x6",
+                    "profile": {
+                        "login": "ann@example.com",
+                        "firstName": "Ann",
+                        "lastName": "Pasten",
+                        "locale": "en",
+                        "timeZone": "America/Los_Angeles"
+                    }
+                },
+                "factor": {
+                    "id": "1337831cjAy4WtMOL4x6",
+                    "factorType": "webauthn",
+                    "provider": "FIDO",
+                    "vendorName": "FIDO",
+                    "_embedded": {
+                        "activation": {
+                            "rp": {
+                                "name": "Example, Inc"
+                            },
+                            "user": {
+                                "displayName": "Ann Pasten",
+                                "name": "ann@example.com",
+                                "id": "13373h4rlzEuUlUOY4x6"
+                            },
+                            "pubKeyCredParams": [
+                                {
+                                    "type": "public-key",
+                                    "alg": -7
+                                },
+                                {
+                                    "type": "public-key",
+                                    "alg": -257
+                                }
+                            ],
+                            "challenge": "QPABsCE0Xkbzlpqb6KbS",
+                            "attestation": "direct",
+                            "authenticatorSelection": {
+                                "userVerification": "optional",
+                                "requireResidentKey": False
+                            },
+                            "u2fParams": {
+                                "appid": "https://example.okta.com"
+                            },
+                            "excludeCredentials": []
+                        }
+                    }
+                }
+            },
+            "_links": {
+                "next": {
+                    "name": "activate",
+                    "href": "https://example.okta.com/api/v1/authn/factors/1337831cjAy4WtMOL4x6/lifecycle/activate",
+                    "hints": {
+                        "allow": [
+                            "POST"
+                        ]
+                    }
+                },
+            }
+        }
+
+        mfa_activation_response = {
+            "status": "SUCCESS",
+            "sessionToken": "13381WI0WOge2jey1crR6AnAkqfXZNUjoAgnWoGXU3WVaHN8dP7Pgln",
+            "_embedded": {
+                "user": {
+                    "id": "13373h4rlzEuUlUOY4x6",
+                    "profile": {
+                        "login": "ann@example.com",
+                        "firstName": "Ann",
+                        "lastName": "Pasten",
+                        "locale": "en",
+                        "timeZone": "America/Los_Angeles"
+                    }
+                }
+            }
+        }
+
+        setup_fido_webauthn_url = self.okta_org_url + '/user/settings/factors/setup?factorType=FIDO_WEBAUTHN'
+        verify_password_redirect_url = self.okta_org_url + '/user/verify_password?fromURI=%2Fenduser%2Fsettings'
+
+        # Request FIDO authenticator setup - get redirected to password verification
+        responses.add(responses.GET, setup_fido_webauthn_url, status=302,
+                      adding_headers={'Location': verify_password_redirect_url})
+        responses.add(responses.GET, verify_password_redirect_url, status=200, body=setup_factors_response)
+        responses.add(responses.POST, self.okta_org_url + '/user/verify_password', status=200)
+
+        # MFA for password verification
+        responses.add(responses.GET, self.okta_org_url + '/login/second-factor?fromURI=%2Fenduser%2Fsettings&'
+                                                         'forcePrompt=true&hideBgImage=true',
+                      status=200, body=second_factor_response)
+        responses.add(responses.POST, self.okta_org_url + '/api/v1/authn', status=200, body=json.dumps(auth_response))
+
+        # Continue FIDO authenticator setup once password re-verified
+        responses.add(responses.GET, setup_fido_webauthn_url, status=200, body=setup_factor_response)
+
+        # Introspect webauthn factors
+        responses.add(responses.POST, self.okta_org_url + '/api/v1/authn/introspect', status=200,
+                      body=json.dumps(introspect_response))
+
+        # Enroll & Activate new webauthn factor
+        responses.add(responses.POST, introspect_response['_embedded']['factors'][0]['_links']['enroll']['href'],
+                      status=200, body=json.dumps(enrollment_response))
+        responses.add(responses.POST, enrollment_response['_links']['next']['href'], status=200,
+                      body=json.dumps(mfa_activation_response))
+
+        # Finalize factor activation
+        enrollment_finalization_redirect_url = self.okta_org_url + '/enduser/settings?enrolledFactor=FIDO_WEBAUTHN'
+        enrollment_finalization_url = self.okta_org_url + '/login/sessionCookieRedirect?' \
+                                                          'checkAccountSetupComplete=true&token={session_token}&' \
+                                                          'redirectUrl={redirect_url}'.format(
+            session_token=mfa_activation_response['sessionToken'],
+            redirect_url=quote(enrollment_finalization_redirect_url))
+
+        responses.add(responses.GET, url=enrollment_finalization_url, status=302,
+                      adding_headers={'Location': enrollment_finalization_redirect_url})
+        responses.add(responses.GET, url=enrollment_finalization_redirect_url, status=200)
+
+        credential_id, user_name = self.client.setup_fido_authenticator()
+        assert credential_id == b'pasten-credential-id'
+        assert user_name == 'ann@example.com'
+
+    @responses.activate
     def test_get_saml_response(self):
         """Test that the SAML reponse was successful"""
         responses.add(responses.GET, 'https://example.okta.com/app/gimmecreds/exkatg7u9g6LJfFrZ0h7/sso/saml', status=200, body=self.login_saml)
