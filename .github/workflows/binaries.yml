@@ -1,4 +1,5 @@
 name: Binaries
+description: build standalone executables using PyInstaller
 
 on:
   push:
