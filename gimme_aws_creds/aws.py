@@ -121,8 +121,12 @@ class AwsResolver(object):
         # Return role if no Roles are present
         if not roles:
             role = next(iter(idp_table))
+            if len(role.split(':')) == 6:
+                friendly_role_name = role.split('/')[-1]
+            else:
+                friendly_role_name='SingleRole'
             idp = idp_table[role]
-            result.append(commondef.RoleSet(idp=idp, role=role, friendly_account_name='SingleAccountName', friendly_role_name='SingleRole'))
+            result.append(commondef.RoleSet(idp=idp, role=role, friendly_account_name='SingleAccountName', friendly_role_name=friendly_role_name))
             return result
 
         for role_item in roles:
