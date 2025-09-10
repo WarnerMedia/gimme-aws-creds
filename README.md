@@ -28,9 +28,11 @@ Python 3.7+
 
 ## Installation
 
-This is a Python 3 project.
+The WarnerMedia fork of gimme-aws-creds is available as a precompiled standalone executable from the GitHub releases at https://github.com/WarnerMedia/gimme-aws-creds.
 
-Install/Upgrade from PyPi:
+__OR__
+
+Install/Upgrade as a python module from PyPi:
 
 ```bash
 pip3 install --upgrade gimme-aws-creds
