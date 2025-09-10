@@ -100,7 +100,12 @@ jobs:
       - name: Build exe for Windows
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+            VCPKG_ROOT: 'C:\vcpkg'
+            OPENSSL_DIR: 'C:\vcpkg\installed\arm64-windows-static'
         run: |
+          vcpkg install openssl:arm64-windows-static
+          vcpkg integrate install
           ./venv/Scripts/python -m pip install --upgrade pip
           ./venv/Scripts/python -m pip install --only-binary=:all: -r requirements_dev.txt
           ./venv/Scripts/python -m pip install .
