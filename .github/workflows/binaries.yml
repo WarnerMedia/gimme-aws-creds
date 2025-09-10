@@ -2,7 +2,7 @@ name: Binaries
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ '*' ]
   pull_request:
     branches: [ main, master, fix/rebase-2.8.2 ]
 
