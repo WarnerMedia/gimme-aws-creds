@@ -29,5 +29,5 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: "artifacts/*.zip"
+          artifacts: "artifacts/*"
           tag: ${{ github.ref_name }}
