@@ -17,14 +17,15 @@ import json
 import os
 import re
 import sys
+import platform
 import concurrent.futures
 
 # extras
 import boto3
 import requests
 from botocore.exceptions import ClientError
-from okta.framework.ApiClient import ApiClient
-from okta.framework.OktaError import OktaError
+from okta.api_client import APIClient
+from okta.errors.error import Error as OktaError
 
 # local imports
 from . import errors, ui, version
@@ -34,6 +35,7 @@ from .default import DefaultResolver
 from .okta_identity_engine import OktaIdentityEngine
 from .okta_classic import OktaClassicClient
 from .registered_authenticators import RegisteredAuthenticators
+from .profiles import Profile
 
 
 class GimmeAWSCreds(object):
@@ -77,6 +79,7 @@ class GimmeAWSCreds(object):
             os.path.join(self.FILE_ROOT, '.aws', 'credentials')
         )
         self._cache = {}
+        self.skip_DT = False
 
     #  this is modified code from https://github.com/nimbusscale/okta_aws_login
     def _write_aws_creds(self, profile, access_key, secret_key, token, expiration, aws_config=None):
@@ -221,8 +224,8 @@ class GimmeAWSCreds(object):
         """ Call the Okta User API and process the results to return
         just the information we need for gimme_aws_creds"""
         # We need access to the entire JSON response from the Okta APIs, so we need to
-        # use the low-level ApiClient instead of UsersClient and AppInstanceClient
-        users_client = ApiClient(okta_org_url, okta_api_key, pathname='/api/v1/users')
+        # use the low-level APIClient instead of UsersClient and AppInstanceClient
+        users_client = APIClient(okta_org_url, okta_api_key, pathname='/api/v1/users')
 
         # Get User information
         try:
@@ -460,6 +463,9 @@ class GimmeAWSCreds(object):
         config.get_args()
         self._cache['conf_dict'] = config.get_config_dict()
 
+        if config.disable_keychain is True:
+            self.conf_dict['enable_keychain'] = False
+
         for value in self.envvar_list:
             if self.ui.environ.get(value):
                 key = self.envvar_conf_map.get(value, value).lower()
@@ -496,23 +502,17 @@ class GimmeAWSCreds(object):
 
     def set_okta_platform(self, okta_platform):
         self._cache['okta_platform'] = okta_platform
-    
+
     @property
     def okta_platform(self):
         if 'okta_platform' in self._cache:
             return self._cache['okta_platform']
-        
-        # Treat this domain as classic, even if it's OIE
-        if self.config.force_classic == True or self.conf_dict.get('force_classic') == "True":
-            self.ui.message('Okta Classic login flow enabled')
-            self.set_okta_platform('classic')
-            return 'classic'
-        
+
         response = requests.get(
             self.okta_org_url + '/.well-known/okta-organization',
             headers={
                 'Accept': 'application/json',
-                'User-Agent': "gimme-aws-creds {}".format(version)
+                'User-Agent': "gimme-aws-creds {};{};{}".format(version, sys.platform, platform.python_version())
             },
             timeout=30
         )
@@ -524,48 +524,15 @@ class GimmeAWSCreds(object):
                 ret = 'classic'
             elif response_data['pipeline'] == 'idx':
                 ret = 'identity_engine'
-                if not self.conf_dict.get('client_id'):
-                    raise errors.GimmeAWSCredsError('OAuth Client ID is required for Okta Identity Engine domains.  Try running --config again.')
-            else:
-                raise RuntimeError('Unknown Okta platform type: {}'.format(response_data['pipeline']))
-        else:
-            response.raise_for_status()
-
-        self.set_okta_platform(ret)
-        return ret
-
-    def set_okta_platform(self, okta_platform):
-        self._cache['okta_platform'] = okta_platform
-
-    @property
-    def okta_platform(self):
-        if 'okta_platform' in self._cache:
-            return self._cache['okta_platform']
-
-        # Treat this domain as classic, even if it's OIE
-        if self.config.force_classic == True or self.conf_dict.get('force_classic') == "True":
-            self.ui.message('Okta Classic login flow enabled')
-            self.set_okta_platform('classic')
-            return 'classic'
-
-        response = requests.get(
-            self.okta_org_url + '/.well-known/okta-organization',
-            headers={
-                'Accept': 'application/json',
-                'User-Agent': "gimme-aws-creds {}".format(version)
-            },
-            timeout=30
-        )
-
-        response_data = response.json()
-
-        if response.status_code == 200:
-            if response_data['pipeline'] == 'v1':
-                ret = 'classic'
-            elif response_data['pipeline'] == 'idx':
-                ret = 'identity_engine'
-                if not self.conf_dict.get('client_id'):
-                    raise errors.GimmeAWSCredsError('OAuth Client ID is required for Okta Identity Engine domains.  Try running --config again.')
+                # Force_Classic is set - treat this domain as classic
+                if self.config.force_classic is True or self.conf_dict.get('force_classic') is True:
+                    self.ui.message('Okta Classic login flow enabled')
+                    ret = 'classic'
+                    # Skip Device Token registration
+                    self.skip_DT = True
+                else:
+                    if not self.conf_dict.get('client_id'):
+                        raise errors.GimmeAWSCredsError('OAuth Client ID is required for Okta Identity Engine domains.  Try running --config again.')
             else:
                 raise RuntimeError('Unknown Okta platform type: {}'.format(response_data['pipeline']))
         else:
@@ -606,6 +573,7 @@ class GimmeAWSCreds(object):
                 self.okta_org_url,
                 self.config.verify_ssl_certs,
                 self.device_token,
+                self.conf_dict.get('enable_keychain', True)
             )
 
             if self.config.username is not None:
@@ -618,6 +586,12 @@ class GimmeAWSCreds(object):
 
             if self.conf_dict.get('preferred_mfa_type'):
                 okta.set_preferred_mfa_type(self.conf_dict['preferred_mfa_type'])
+
+            if self.conf_dict.get('preferred_mfa_provider'):
+                okta.set_preferred_mfa_provider(self.conf_dict['preferred_mfa_provider'])
+
+            if self.conf_dict.get('duo_universal_factor'):
+                okta.set_duo_universal_factor(self.conf_dict.get('duo_universal_factor'))
 
             if self.config.mfa_code is not None:
                 okta.set_mfa_code(self.config.mfa_code)
@@ -637,7 +611,7 @@ class GimmeAWSCreds(object):
 
     @property
     def device_token(self):
-        if self.config.action_register_device is True:
+        if self.config.action_register_device is True or self.skip_DT is True:
             self.conf_dict['device_token'] = None
 
         return self.conf_dict.get('device_token')
@@ -649,7 +623,7 @@ class GimmeAWSCreds(object):
     def auth_session(self):
         if 'auth_session' in self._cache:
             return self._cache['auth_session']
-        if self.config.open_browser is True or self.conf_dict.get('open_browser') == "True":
+        if self.config.open_browser is True or self.conf_dict.get('open_browser') is True:
             open_browser = True
         else:
             open_browser = False
@@ -811,6 +785,7 @@ class GimmeAWSCreds(object):
         cred_profile = self.conf_dict['cred_profile']
         resolve_alias = self.conf_dict['resolve_aws_alias']
         include_path = self.conf_dict.get('include_path')
+        profile_name = self.get_profile_name(cred_profile, include_path, naming_data, resolve_alias, role)
 
         # get_profile_name doesn't have access to credentials, so do this here
         if resolve_alias:
@@ -825,8 +800,6 @@ class GimmeAWSCreds(object):
                 except (ClientError, IndexError, KeyError):
                     # just leave the name alone if we couldn't get the alias
                     pass
-
-        profile_name = self.get_profile_name(cred_profile, include_path, naming_data, resolve_alias, role)
 
         return {
             'shared_credentials_file': self.AWS_CONFIG,
@@ -851,26 +824,15 @@ class GimmeAWSCreds(object):
         }
 
     def get_profile_name(self, cred_profile, include_path, naming_data, resolve_alias, role):
-        if cred_profile.lower() == 'default':
-            profile_name = 'default'
-        elif cred_profile.lower() == 'role':
-            profile_name = naming_data['role']
-        elif cred_profile.lower() in ['acc-role', 'acc:role']:
-            delimiter = cred_profile[3]
-            account = naming_data['account']
-            role_name = naming_data['role']
-            path = naming_data['path']
-            if resolve_alias == 'True':
-                account_alias = self._get_alias_from_friendly_name(role.friendly_account_name)
-                if account_alias:
-                    account = account_alias
-            if include_path == 'True':
-                role_name = ''.join([path, role_name])
-            profile_name = delimiter.join([account,
-                                     role_name])
-        else:
-            profile_name = cred_profile
-        return profile_name
+        cred_profile = Profile(cred_profile, include_path)
+        account = self._get_account_name(naming_data['account'], role, resolve_alias)
+        return cred_profile.name_for(account, naming_data['role'], naming_data['path'])
+
+    def _get_account_name(self, account, role, resolve_alias):
+        if resolve_alias is False:
+            return account
+        account_alias = self._get_alias_from_friendly_name(role.friendly_account_name)
+        return account_alias or account
 
     def iter_selected_aws_credentials(self):
         results = []
@@ -906,6 +868,7 @@ class GimmeAWSCreds(object):
             self.handle_setup_fido_authenticator()
         self.handle_action_store_json_creds()
         self.handle_action_list_roles()
+
 
         # for each data item, if we have an override on output, prioritize that
         # if we do not, prioritize writing credentials to file if that is in our
@@ -985,7 +948,7 @@ class GimmeAWSCreds(object):
 
     def handle_action_register_device(self):
         # Capture the Device Token and write it to the config file
-        if self.okta_platform == "classic" and ( not self.device_token or self.config.action_register_device is True ):
+        if self.okta_platform == "classic" and self.skip_DT is False and ( not self.device_token or self.config.action_register_device is True ):
             if not self.config.action_register_device:
                 self.ui.notify('\n*** No device token found in configuration file, it will be created.')
                 self.ui.notify('*** You may be prompted for MFA more than once for this run.\n')

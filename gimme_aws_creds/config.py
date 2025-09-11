@@ -15,7 +15,7 @@ import os
 import requests
 from urllib.parse import urlparse
 
-from . import errors, ui, version
+from . import errors, profiles, ui, version
 
 
 class Config(object):
@@ -37,6 +37,7 @@ class Config(object):
             'OKTA_CONFIG',
             os.path.join(self.FILE_ROOT, '.okta_aws_login_config')
         )
+        self.disable_keychain = False
         self.open_browser = False
         self.action_register_device = False
         self.username = None
@@ -153,6 +154,10 @@ class Config(object):
             help='Automatically open a webbrowser for device authorization (Okta Identity Engine only)'
         )
         parser.add_argument(
+            '--disable-keychain', action='store_true',
+            help="Disable the use of the system keychain to store the user's password"
+        )
+        parser.add_argument(
             '--force-classic', action='store_true',
             help='Force the use of the Okta Classic login process (Okta Identity Engine only)'
         )
@@ -165,6 +170,7 @@ class Config(object):
         self.action_register_device = args.action_register_device
         self.action_setup_fido_authenticator = args.action_setup_fido_authenticator
         self.open_browser = args.open_browser
+        self.disable_keychain = args.disable_keychain
         self.force_classic = args.force_classic
 
         if args.insecure is True:
@@ -189,18 +195,28 @@ class Config(object):
         self.conf_profile = args.profile or 'DEFAULT'
 
     def _handle_config(self, config, profile_config, include_inherits = True):
+        # Convert True/False strings to booleans
+        for key in profile_config:
+            if profile_config[key] == 'True':
+                profile_config[key] = True
+            elif profile_config[key] == 'False':
+                profile_config[key] = False
+
         if "inherits" in profile_config.keys() and include_inherits:
             self.ui.message("Using inherited config: " + profile_config["inherits"])
             if profile_config["inherits"] not in config:
                 raise errors.GimmeAWSCredsError(self.conf_profile + " inherits from " + profile_config["inherits"] + ", but could not find " + profile_config["inherits"])
-            combined_config = {
+            profile_config = {
                 **self._handle_config(config, dict(config[profile_config["inherits"]])),
                 **profile_config,
             }
-            del combined_config["inherits"]
-            return combined_config
-        else:
-            return profile_config
+            del profile_config["inherits"]
+
+        # Empty string in force_classic should be handled as True - this makes sure that migrating from Classic to OIE is seamless
+        if profile_config.get('force_classic') == '' or profile_config.get('force_classic') is None:
+            profile_config['force_classic'] = True
+
+        return profile_config
 
     def get_config_dict(self, include_inherits = True):
         """returns the conf dict from the okta config file"""
@@ -238,6 +254,7 @@ class Config(object):
                 aws_default_duration = Default AWS session duration (3600)
                 preferred_mfa_type = Select this MFA device type automatically
                 include_path - (optional) includes that full role path to the role name for profile
+                enable_keychain = (optional) enable the use of the system keychain to store the user's password
 
         """
         config = configparser.ConfigParser()
@@ -262,7 +279,8 @@ class Config(object):
             'aws_default_duration': '3600',
             'output_format': 'export',
             'force_classic': '',
-            'open_browser': ''
+            'open_browser': '',
+            'enable_keychain': 'y'
         }
 
         # See if a config file already exists.
@@ -292,6 +310,7 @@ class Config(object):
         # These options are only used in the Classic authentication flow
         if self._okta_platform == 'classic' or config_dict['force_classic'] is True:
             config_dict['okta_username'] = self._get_okta_username(defaults['okta_username'])
+            config_dict['enable_keychain'] = self._get_enable_keychain(defaults['enable_keychain'])
             config_dict['preferred_mfa_type'] = self._get_preferred_mfa_type(defaults['preferred_mfa_type'])
             config_dict['remember_device'] = self._get_remember_device(defaults['remember_device'])
 
@@ -310,7 +329,7 @@ class Config(object):
         config_dict['aws_default_duration'] = self._get_aws_default_duration(defaults['aws_default_duration'])
         if config_dict['gimme_creds_server'] != 'appurl':
             config_dict['aws_appname'] = self._get_aws_appname(defaults['aws_appname'])
-        
+
         config_dict["output_format"] = ''
         if not config_dict["write_aws_creds"]:
             config_dict['output_format'] = self._get_output_format(defaults['output_format'])
@@ -387,6 +406,15 @@ class Config(object):
         self._okta_auth_server = okta_auth_server
 
         return okta_auth_server
+    
+    def _get_enable_keychain(self, default_entry):
+        """ enable the use of the system keychain to store the user's password """
+
+        while True:
+            try:
+                return self._get_user_input_yes_no("Use the system keychain to store the user's password? (y/n)", default_entry)
+            except ValueError:
+                ui.default.warning("Enable keychain must be either y or n.")
 
     def _get_client_id_entry(self, default_entry):
         """ Get and validate client_id """
@@ -401,24 +429,19 @@ class Config(object):
     def _get_appurl_entry(self, default_entry):
         """ Get and validate app_url """
         ui.default.message(
-            "Enter the application link. This is https://something.okta[preview].com/home/amazon_aws/<app_id>/something")
+            "Enter the application link. This is {}/home/amazon_aws/<app_id>/something".format(self._okta_org_url))
         okta_app_url_valid = False
         app_url = default_entry
 
         while okta_app_url_valid is False:
             app_url = self._get_user_input("Application url", default_entry)
             url_parse_results = urlparse(app_url)
-            allowlist = [
-                "okta.com",
-                "oktapreview.com",
-                "okta-emea.com",
-            ]
-
-            if url_parse_results.scheme == "https" and any(urlelement in url_parse_results.hostname for urlelement in allowlist):
+            okta_org_parse = urlparse(self._okta_org_url)
+            if url_parse_results.scheme == "https" and url_parse_results.hostname == okta_org_parse.hostname:
                 okta_app_url_valid = True
             else:
                 ui.default.warning(
-                    "Okta organization URL must be HTTPS URL for okta.com or oktapreview.com or okta-emea.com domain")
+                    "Okta organization URL must be HTTPS URL for {}".format(self._okta_org_url))
 
         self._app_url = app_url
 
@@ -489,7 +512,8 @@ class Config(object):
         ui.default.message(
             "The AWS credential profile defines which profile is used to store the temp AWS creds.\n"
             "If set to 'role' then a new profile will be created matching the role name assumed by the user.\n"
-            "If set to 'acc-role' or 'acc:role' then a new profile will be created matching the role name assumed by the user, but prefixed with account alias or number and the given delimiter to avoid collisions.\n"
+            "If set to 'acc' then a new profile will be created matching the account number.\n"
+            "If set to 'acc-role' then a new profile will be created matching the role name assumed by the user, but prefixed with account number (or alias if resolve_alias is true) to avoid collisions. Any character may be substituted for the hyphen.\n"
             "If set to 'default' then the temp creds will be stored in the default profile\n"
             "If set to any other value, the name of the profile will match that value."
         )
@@ -497,9 +521,7 @@ class Config(object):
         cred_profile = self._get_user_input(
             "AWS Credential Profile", default_entry)
 
-        if cred_profile.lower() in ['default', 'role', 'acc-role', 'acc:role']:
-            cred_profile = cred_profile.lower()
-
+        cred_profile = profiles.Profile(cred_profile).canonicalize()
         return cred_profile
 
     def _get_aws_appname(self, default_entry):
@@ -598,7 +620,7 @@ class Config(object):
                     "Force classic login flow", default_entry)
             except ValueError:
                 ui.default.warning("Force Classic login flow must be either y or n.")
-    
+
     def _get_open_browser(self, default_entry):
         """Option to automatically open the default browser for OIE authentication"""
         ui.default.message(

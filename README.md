@@ -18,15 +18,21 @@ Okta is a registered trademark of Okta, Inc. and this tool has no affiliation wi
 
 Python 3.7+
 
+####  A Note on Python 3.10+ Compatibility on Windows
+
+`gimme-aws-creds` depends on the [ctap-keyring-device](https://pypi.org/project/ctap-keyring-device/) library for WebAuthn support.  All of the released versions of ctap-keyring-device require [winRT](https://pypi.org/project/winrt/) on Windows, which only works on Python 3.9 and lower and is no longer maintained. Until a version of ctap-keyring-device that supports `winSDK` (the replacement for winRT) is released to PyPi, or some other solution is found, WebAuthn support will not be available for people running Python 3.10+ on Windows.
+
 ### Optional
 
 [Gimme-creds-lambda](https://github.com/Nike-Inc/gimme-aws-creds/tree/master/lambda) can be used as a proxy to the Okta APIs needed by gimme-aws-creds.  This removes the requirement of an Okta API key.  Gimme-aws-creds authenticates to gimme-creds-lambda using OpenID Connect and the lambda handles all interactions with the Okta APIs.  Alternately, you can set the `OKTA_API_KEY` environment variable and the `gimme_creds_server` configuration value to 'internal' to call the Okta APIs directly from gimme-aws-creds.
 
 ## Installation
 
-This is a Python 3 project.
+The WarnerMedia fork of gimme-aws-creds is available as a precompiled standalone executable from the GitHub releases at https://github.com/WarnerMedia/gimme-aws-creds.
 
-Install/Upgrade from PyPi:
+__OR__
+
+Install/Upgrade as a python module from PyPi:
 
 ```bash
 pip3 install --upgrade gimme-aws-creds
@@ -45,7 +51,7 @@ __OR__
 Install the gimme-aws-creds package if you have already cloned the source:
 
 ```bash
-python3 setup.py install
+python -m pip install .
 ```
 
 __OR__
@@ -208,7 +214,8 @@ A configuration wizard will prompt you to enter the necessary configuration para
 - write_aws_creds - True or False - If True, the AWS credentials will be written to `~/.aws/credentials` otherwise it will be written to stdout.
 - cred_profile - If writing to the AWS cred file, this sets the name of the AWS credential profile.
   - The reserved word `role` will use the name component of the role arn as the profile name. i.e. arn:aws:iam::123456789012:role/okta-1234-role becomes section [okta-1234-role] in the aws credentials file
-  - The reserved words `acc-role` or `acc:role` will use the name component of the role arn prepended with the indicated delimiter and the account number (or alias if `resolve_aws_alias` is set to y) to avoid collisions, i.e. arn:aws:iam::123456789012:role/okta-1234-role becomes section [123456789012-okta-1234-role], or if `resolve_aws_alias` [<my alias>-okta-1234-role] in the aws credentials file
+  - The reserved word `acc` will use the account number (or alias if `resolve_aws_alias` is set to y) as the profile name. i.e. arn:aws:iam::123456789012:role/okta-1234-role becomes section [arn:aws:iam::123456789012] or if `resolve_aws_alias` [okta-1234-role] in the aws credentials file.
+  - The reserved word `acc-role` will use the name component of the role arn prepended with account number (or alias if `resolve_aws_alias` is set to y) to avoid collisions, i.e. arn:aws:iam::123456789012:role/okta-1234-role becomes section [123456789012-okta-1234-role], or if `resolve_aws_alias` [okta-1234-role] in the aws credentials file. The hyphen may be replaced by any character.
   - If set to `default` then the temp creds will be stored in the default profile
   - Note: if there are multiple roles, and `default` is selected it will be overwritten multiple times and last role wins. The same happens when `role` is selected and you have many accounts with the same role names. Consider using `acc-role` if this happens.
 - aws_appname - This is optional. The Okta AWS App name, which has the role you want to assume.
@@ -216,6 +223,7 @@ A configuration wizard will prompt you to enter the necessary configuration para
 - aws_default_duration = This is optional. Lifetime for temporary credentials, in seconds. Defaults to 1 hour (3600)
 - app_url - If using 'appurl' setting for gimme_creds_server, this sets the url to the aws application configured in Okta. It is typically something like <https://something.okta[preview].com/home/amazon_aws/app_instance_id/something>
 - okta_username - use this username to authenticate
+- enable_keychain - enable the use of the system keychain to store the user's password
 - preferred_mfa_type - automatically select a particular  device when prompted for MFA:
   - push - Okta Verify App push or DUO push (depends on okta supplied provider type)
   - token:software:totp - OTP using the Okta Verify App
@@ -225,7 +233,15 @@ A configuration wizard will prompt you to enter the necessary configuration para
   - email - OTP via email
   - web - DUO uses localhost webbrowser to support push|call|passcode
   - passcode - DUO uses `OKTA_MFA_CODE` or `--mfa-code` if set, or prompts user for passcode(OTP).
-  
+  - claims_provider - DUO Universal Prompt
+- preferred_mfa_provider - (optional) automatically select a particular provider when prompted for MFA:
+  - GOOGLE
+  - OKTA
+  - DUO
+- duo_universal_factor - (optional) Configure which type of factor to use with Duo Universal Prompt. Must be one of (case-sensitive):
+  - `Duo Push` (default)
+  - `Passcode`
+  - `Phone Call`
 - resolve_aws_alias - y or n. If yes, gimme-aws-creds will try to resolve AWS account ids with respective alias names (default: n). This option can also be set interactively in the command line using `-r` or `--resolve` parameter
 - include_path - (optional) Includes full role path to the role name in AWS credential profile name. (default: n).  If `y`: `<acct>-/some/path/administrator`. If `n`: `<acct>-administrator`
 - remember_device - y or n. If yes, the MFA device will be remembered by Okta service for a limited time. This option can also be set interactively in the command line using `-m` or `--remember-device`
@@ -374,7 +390,7 @@ for data in creds.iter_selected_aws_credentials():
         if len(piece) == 12 and piece.isdigit():
             account_id = piece
             break
-  
+
     if account_id is None:
         raise ValueError("Didn't find aws_account_id (12 digits) in {}".format(arn))
 
@@ -390,7 +406,7 @@ gimme-aws-creds works both on FIDO1 enabled org and WebAuthN enabled org
 Note that FIDO1 will probably be deprecated in the near future as standards moves forward to WebAuthN
 
 WebAuthN support is available for usb security keys (gimme-aws-creds relies on the yubico fido2 lib).
- 
+
 To use your local machine as an authenticator, along with Touch ID or Windows Hello, if available,
 you must register a new authenticator via gimme-aws-creds, using:
 ```bash

@@ -10,8 +10,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and* limitations under the License.*
 """
 import base64
+import sys
+import platform
 import copy
-import getpass
 import re
 import socket
 import time
@@ -31,10 +32,18 @@ from keyring.errors import PasswordDeleteError
 from requests.adapters import HTTPAdapter, Retry
 
 from gimme_aws_creds.u2f import FactorU2F
-from gimme_aws_creds.webauthn import WebAuthnClient, FakeAssertion
+
+# avoid importing ctap-keyring-device on Windows until it supports Python 3.10+
+if sys.platform == "win32" and sys.version_info >= (3, 10):
+    from gimme_aws_creds.dummy_webauthn import WebAuthnClient, FakeAssertion
+else:
+    from gimme_aws_creds.webauthn import WebAuthnClient, FakeAssertion
+
 from . import errors, ui, version, duo
+from .duo_universal import OktaDuoUniversal
 from .errors import GimmeAWSCredsMFAEnrollStatus
 from .registered_authenticators import RegisteredAuthenticators
+
 
 
 class OktaClassicClient(object):
@@ -46,7 +55,7 @@ class OktaClassicClient(object):
     KEYRING_SERVICE = 'gimme-aws-creds'
     KEYRING_ENABLED = not isinstance(keyring.get_keyring(), FailKeyring)
 
-    def __init__(self, gac_ui, okta_org_url, verify_ssl_certs=True, device_token=None):
+    def __init__(self, gac_ui, okta_org_url, verify_ssl_certs=True, device_token=None, use_keyring=True):
         """
         :type gac_ui: ui.UserInterface
         :param okta_org_url: Base URL string for Okta IDP.
@@ -57,12 +66,16 @@ class OktaClassicClient(object):
         self._okta_org_url = okta_org_url
         self._verify_ssl_certs = verify_ssl_certs
 
+        self._use_keyring = use_keyring
+
         if verify_ssl_certs is False:
             requests.packages.urllib3.disable_warnings()
 
         self._username = None
         self._password = None
         self._preferred_mfa_type = None
+        self._preferred_mfa_provider = None
+        self._duo_universal_factor = 'Duo Push'
         self._mfa_code = None
         self._remember_device = None
 
@@ -102,8 +115,14 @@ class OktaClassicClient(object):
     def set_preferred_mfa_type(self, preferred_mfa_type):
         self._preferred_mfa_type = preferred_mfa_type
 
+    def set_preferred_mfa_provider(self, preferred_mfa_provider):
+        self._preferred_mfa_provider = preferred_mfa_provider
+
     def set_mfa_code(self, mfa_code):
         self._mfa_code = mfa_code
+
+    def set_duo_universal_factor(self, duo_universal_factor):
+        self._duo_universal_factor = duo_universal_factor
 
     def set_remember_device(self, remember_device):
         self._remember_device = bool(remember_device)
@@ -159,30 +178,33 @@ class OktaClassicClient(object):
         """ Authenticate the user and return the Okta Session ID and username"""
         login_response = self.auth()
 
-        session_url = self._okta_org_url + '/login/sessionCookieRedirect'
-
-        if 'redirect_uri' not in kwargs:
-            redirect_uri = 'http://localhost:8080/login'
+        if 'userSession' in login_response:
+            return login_response['userSession']
         else:
-            redirect_uri = kwargs['redirect_uri']
+            session_url = self._okta_org_url + '/login/sessionCookieRedirect'
 
-        params = {
-            'token': login_response['sessionToken'],
-            'redirectUrl': redirect_uri
-        }
+            if 'redirect_uri' not in kwargs:
+                redirect_uri = 'http://localhost:8080/login'
+            else:
+                redirect_uri = kwargs['redirect_uri']
 
-        response = self._http_client.get(
-            session_url,
-            params=params,
-            headers=self._get_headers(),
-            verify=self._verify_ssl_certs,
-            allow_redirects=False
-        )
-        return {
-            "username": login_response['_embedded']['user']['profile']['login'],
-            "session": response.cookies['sid'],
-            "device_token": self._http_client.cookies['DT']
-        }
+            params = {
+                'token': login_response['sessionToken'],
+                'redirectUrl': redirect_uri
+            }
+
+            response = self._http_client.get(
+                session_url,
+                params=params,
+                headers=self._get_headers(),
+                verify=self._verify_ssl_certs,
+                allow_redirects=False
+            )
+            return {
+                "username": login_response['_embedded']['user']['profile']['login'],
+                "session": response.cookies['sid'],
+                "device_token": self._http_client.cookies['DT']
+            }
 
     def auth_oauth(self, client_id, **kwargs):
         """ Login to Okta and retrieve access token, ID token or both """
@@ -248,6 +270,11 @@ class OktaClassicClient(object):
         )
         response.raise_for_status()
 
+        # If we didn't get a 302 redirect, the MFA factor didn't meet the requirement for the app
+        if 'Location' not in response.headers:
+            raise errors.GimmeAWSCredsError(
+                "LOGIN ERROR: Provided MFA factor does not meet the authentication policies for this application", 2
+            )
         url_parse_results = urlparse(response.headers['Location'])
 
         query_result = parse_qs(url_parse_results.fragment)
@@ -266,7 +293,7 @@ class OktaClassicClient(object):
     def _get_headers():
         """sets the default headers"""
         headers = {
-            'User-Agent': "gimme-aws-creds {}".format(version),
+            'User-Agent': "gimme-aws-creds {};{};{}".format(version, sys.platform, platform.python_version()),
             'Accept': 'application/json',
             'Content-Type': 'application/json',
         }
@@ -358,7 +385,7 @@ class OktaClassicClient(object):
         # ref: https://developer.okta.com/docs/reference/error-codes/#example-errors-listed-by-http-return-code
         elif response.status_code in [400, 401, 403, 404, 409, 429, 500, 501, 503]:
             if response_data['errorCode'] == "E0000004":
-                if self.KEYRING_ENABLED:
+                if self.KEYRING_ENABLED and self._use_keyring:
                     try:
                         self.ui.info("Stored password is invalid, clearing.  Please try again")
                         keyring.delete_password(self.KEYRING_SERVICE, creds['username'])
@@ -451,6 +478,19 @@ class OktaClassicClient(object):
             return {'stateToken': response_data['stateToken'], 'apiResponse': response_data}
         if 'sessionToken' in response_data:
             return {'stateToken': None, 'sessionToken': response_data['sessionToken'], 'apiResponse': response_data}
+
+    def _login_duo_universal(self, state_token, factor):
+        duo_passcode = None
+        if self._duo_universal_factor == 'Passcode':
+            duo_passcode = self.ui.input(message='Duo Passcode: ')
+        duo_client = OktaDuoUniversal(self.ui,
+                                      self._http_client,
+                                      state_token,
+                                      factor,
+                                      self._remember_device,
+                                      self._duo_universal_factor,
+                                      duo_passcode)
+        return duo_client.do_auth()
 
     def _login_input_webauthn_challenge(self, state_token, factor):
         """ Retrieve nonce """
@@ -591,9 +631,15 @@ class OktaClassicClient(object):
         elif factor['factorType'] == 'u2f':
             return self._login_input_webauthn_challenge(state_token, factor)
         elif factor['factorType'] == 'webauthn':
-            return self._login_input_webauthn_challenge(state_token, factor)
+            # Block webauthn until ctap-kering-device is updated to support Python 3.10+ on Windows
+            if sys.platform == "win32" and sys.version_info >= (3, 10):
+                raise errors.GimmeAWSCredsError("WebAuthn devices not supported on this platform", 2)
+            else:
+                return self._login_input_webauthn_challenge(state_token, factor)
         elif factor['factorType'] == 'token:hardware':
             return self._login_input_mfa_challenge(state_token, factor['_links']['verify']['href'])
+        elif factor['factorType'] == 'claims_provider':
+            return self._login_duo_universal(state_token, factor)
 
     def _login_input_mfa_challenge(self, state_token, next_url):
         """ Submit verification code for SMS or TOTP authentication methods"""
@@ -718,7 +764,7 @@ class OktaClassicClient(object):
         else:
             return {'stateToken': None, 'sessionToken': None, 'apiResponse': response_data}
 
-    def get_saml_response(self, url, auth_session = None):
+    def get_saml_response(self, url, auth_session=None):
         """ return the base64 SAML value object from the SAML Response"""
         response = self._http_client.get(url, verify=self._verify_ssl_certs)
         response.raise_for_status()
@@ -813,6 +859,19 @@ class OktaClassicClient(object):
             if not preferred_factors:
                 self.ui.notify('Preferred factor type of {} not available.'.format(self._preferred_mfa_type))
 
+        if self._preferred_mfa_provider is not None:
+            preferred_factors_with_preferred_provider = list(
+                filter(lambda item: item['provider'] == self._preferred_mfa_provider, preferred_factors)
+            )
+            # If filtering for the preferred provider yields no results, announce it,
+            # but don't update the list of preferred factors.
+            if preferred_factors and not preferred_factors_with_preferred_provider:
+                self.ui.notify('Preferred factor provider of {} not available. Will use available factors.'.format(
+                    self._preferred_mfa_provider
+                ))
+            else:
+                preferred_factors = preferred_factors_with_preferred_provider
+
         if len(preferred_factors) == 1:
             factor_name = self._build_factor_name(preferred_factors[0])
             self.ui.info(factor_name + ' selected')
@@ -889,6 +948,8 @@ class OktaClassicClient(object):
             return factor['factorType'] + ": " + factor_name
         elif factor['factorType'] == 'token:hardware':
             return factor['factorType'] + ": " + factor['provider']
+        elif factor['factorType'] == 'claims_provider':
+            return factor['factorType'] + ": " + factor['vendorName']
 
         else:
             return "Unknown MFA type: " + factor['factorType']
@@ -902,7 +963,7 @@ class OktaClassicClient(object):
         username = self._username
 
         password = self._password
-        if not password and self.KEYRING_ENABLED:
+        if not password and self.KEYRING_ENABLED and self._use_keyring:
             try:
                 # If the OS supports a keyring, offer to save the password
                 password = keyring.get_password(self.KEYRING_SERVICE, username)
@@ -914,11 +975,11 @@ class OktaClassicClient(object):
             # via OKTA_USERNAME env and user might not remember.
             for x in range(0, 5):
                 passwd_prompt = "Okta Password for {}: ".format(username)
-                password = getpass.getpass(prompt=passwd_prompt)
+                password = self.ui.input(message=passwd_prompt, hidden=True)
                 if len(password) > 0:
                     break
 
-            if self.KEYRING_ENABLED:
+            if self.KEYRING_ENABLED  and self._use_keyring:
                 # If the OS supports a keyring, offer to save the password
                 if self.ui.input("Do you want to save this password in the keyring? (y/N) ").lower() == 'y':
                     try:
@@ -1064,7 +1125,7 @@ class OktaClassicClient(object):
     @staticmethod
     def _extract_state_token_from_http_response(http_res):
         # extract the stateToken from a javascript variable
-        state_token_re =  re.search(r"var stateToken = '(.*)';", http_res.text)
+        state_token_re = re.search(r"var stateToken = '(.*)';", http_res.text)
         if state_token_re is not None:
             return decode(state_token_re.group(1), "unicode-escape")
 
