@@ -15,7 +15,7 @@ jobs:
         id: get_run_id
         run: |
             run_id=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                "https://api.github.com/repos/${{ github.repository }}/actions/workflows/binaries.yml/runs?status=success" | \
+                "https://api.github.com/repos/${OWNER}/${REPO_NAME}/actions/workflows/binaries.yml/runs?status=success" | \
             jq -r '.workflow_runs|sort_by(.updated_at)[-1].id')
             printf 'run_id=%s\n' "$run_id" >>"$GITHUB_OUTPUT"
       - name: Download all workflow run artifacts
@@ -24,8 +24,11 @@ jobs:
           path: ./artifacts
           run-id: ${{ steps.get_run_id.outputs.run_id }}
       - name: Create Release
+        id: create_release
         uses: softprops/action-gh-release@v2
+      - name: Upload artifacts
+        uses: svenstaro/upload-release-action@v2
         with:
-          files: ./artifacts/**/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: artifacts/*
+          tag: ${{ github.ref }}
