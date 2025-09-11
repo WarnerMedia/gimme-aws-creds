@@ -15,7 +15,7 @@ jobs:
         id: get_run_id
         run: |
             run_id=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                "https://api.github.com/repos/${OWNER}/${REPO_NAME}/actions/workflows/binaries.yml/runs?status=success" | \
+                "https://api.github.com/repos/${{ github.repository }}/actions/workflows/binaries.yml/runs?status=success" | \
             jq -r '.workflow_runs|sort_by(.updated_at)[-1].id')
             printf 'run_id=%s\n' "$run_id" >>"$GITHUB_OUTPUT"
       - name: Download all workflow run artifacts
