@@ -37,7 +37,7 @@ jobs:
             found=0
             for dir in */; do
                if [ -n "$(ls -A "$dir" 2>/dev/null)" ]; then
-                 (cd "$dir" && zip -r "../${dir%/}.zip" .)
+                 (cd "$dir" && zip -r "../${dir%/}.zip" .) || { echo "Failed to create zip for $dir"; exit 1; }
                  found=1
                else
                  echo "Skipping $dir: directory is empty"
