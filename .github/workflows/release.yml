@@ -28,7 +28,7 @@ jobs:
         run: |
             cd artifacts
             for dir in */; do
-               (cd "$dir" && zip "../${dir%/}.zip" *)
+               (cd "$dir" && zip -r "../${dir%/}.zip" . 2>/dev/null || true)
             done
       - name: Create release and upload assets
         id: create_release
