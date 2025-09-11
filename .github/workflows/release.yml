@@ -24,12 +24,10 @@ jobs:
           path: ./artifacts
           run-id: ${{ steps.get_run_id.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create Release
+      - name: Create release and upload assets
         id: create_release
-        uses: softprops/action-gh-release@v2
-      - name: Upload artifacts
-        uses: svenstaro/upload-release-action@v2
+        uses: ncipollo/release-action@v1
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: artifacts/*
-          tag: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: "artifacts/*.zip"
+          tag: ${{ github.ref_name }}
