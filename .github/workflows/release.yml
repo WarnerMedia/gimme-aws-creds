@@ -32,7 +32,7 @@ jobs:
         run: |
             cd artifacts
             for dir in */; do
-               if [ -n "$(find "$dir" -mindepth 1 -print -quit)" ]; then
+               if [ -n "$(ls -A "$dir" 2>/dev/null)" ]; then
                  (cd "$dir" && zip -r "../${dir%/}.zip" .)
                else
                  echo "Skipping $dir: directory is empty"
