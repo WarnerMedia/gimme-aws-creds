@@ -18,8 +18,8 @@ jobs:
                 "https://api.github.com/repos/${{ github.repository }}/actions/workflows/binaries.yml/runs?status=success&per_page=1" | \
             jq -r '.workflow_runs[0].id')
             if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
-              echo "No successful workflow runs found for binaries.yml. Cannot proceed with release." >&2
-              exit 1
+                printf >&2 'No successful workflow runs found for binaries.yml. Cannot create release.\n'
+                exit 1
             fi
             printf 'run_id=%s\n' "$run_id" >>"$GITHUB_OUTPUT"
       - name: Download all workflow run artifacts
@@ -30,14 +30,23 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Archive artifacts
         run: |
-            cd artifacts
+            cd artifacts || {
+              printf >&2 'No artifacts directory. Cannot create release.\n';
+              exit 1
+            }
+            found=0
             for dir in */; do
                if [ -n "$(ls -A "$dir" 2>/dev/null)" ]; then
                  (cd "$dir" && zip -r "../${dir%/}.zip" .)
+                 found=1
                else
                  echo "Skipping $dir: directory is empty"
                fi
             done
+            if [ $found -eq 0 ]; then
+                printf >&2 'No files to archive. Cannot create release.\n'
+                exit 1
+            fi
       - name: Create release and upload assets
         id: create_release
         uses: ncipollo/release-action@v1
