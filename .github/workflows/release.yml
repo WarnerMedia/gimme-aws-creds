@@ -11,10 +11,18 @@ jobs:
     if: github.repository == 'warnermedia/gimme-aws-creds'
     runs-on: ubuntu-latest
     steps:
+      - name: get id of run with latest binaries
+        id: get_run_id
+        run: |
+            run_id=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                "https://api.github.com/repos/${OWNER}/${REPO_NAME}/actions/workflows/binaries.yml/runs?status=success" | \
+            jq -r '.workflow_runs|sort_by(.updated_at)[-1].id')
+            printf 'run_id=%s\n' "$run_id" >>"$GITHUB_OUTPUT"
       - name: Download all workflow run artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
+          run-id: ${{ steps.get_run_id.outputs.run_id }}
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
