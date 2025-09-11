@@ -17,6 +17,10 @@ jobs:
             run_id=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
                 "https://api.github.com/repos/${{ github.repository }}/actions/workflows/binaries.yml/runs?status=success&per_page=1" | \
             jq -r '.workflow_runs[0].id')
+            if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+              echo "No successful workflow runs found for binaries.yml. Cannot proceed with release." >&2
+              exit 1
+            fi
             printf 'run_id=%s\n' "$run_id" >>"$GITHUB_OUTPUT"
       - name: Download all workflow run artifacts
         uses: actions/download-artifact@v4
@@ -28,7 +32,11 @@ jobs:
         run: |
             cd artifacts
             for dir in */; do
-               (cd "$dir" && zip -r "../${dir%/}.zip" . 2>/dev/null || true)
+               if [ -n "$(find "$dir" -mindepth 1 -print -quit)" ]; then
+                 (cd "$dir" && zip -r "../${dir%/}.zip" .)
+               else
+                 echo "Skipping $dir: directory is empty"
+               fi
             done
       - name: Create release and upload assets
         id: create_release
