@@ -24,10 +24,16 @@ jobs:
           path: ./artifacts
           run-id: ${{ steps.get_run_id.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Archive artifacts
+        run: |
+            cd artifacts
+            for dir in */; do
+               (cd "$dir" && zip "../${dir%/}.zip" *)
+            done
       - name: Create release and upload assets
         id: create_release
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: "artifacts/*/*"
+          artifacts: "artifacts/*.zip"
           tag: ${{ github.ref_name }}
