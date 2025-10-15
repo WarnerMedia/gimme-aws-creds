@@ -1,6 +1,6 @@
 name: Release
 
-description: Create a GitHub release and attach built binaries when a version tag is pushed
+# Create a GitHub release and attach built binaries when a version tag is pushed
 
 on:
   push:
