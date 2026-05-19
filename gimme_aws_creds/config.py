@@ -521,7 +521,7 @@ class Config(object):
         cred_profile = self._get_user_input(
             "AWS Credential Profile", default_entry)
 
-        cred_profile = profiles.Profile(cred_profile).canonicalize()
+        cred_profile = profiles.Profile(cred_profile, False).canonicalize()
         return cred_profile
 
     def _get_aws_appname(self, default_entry):
